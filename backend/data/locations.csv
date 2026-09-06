@@ -1,0 +1,19 @@
+location_id,location_name,locality,city,latitude,longitude,location_type
+LOC01,Crescent Mall,Old Bus Stand,Noida,28.5826,77.3456,warehouse
+LOC02,Palm Court Hotel,Sector 22,Noida,28.5636,77.2893,hotel
+LOC03,City Office Tower,New Colony,Noida,28.5607,77.3245,unknown
+LOC04,Highway Dhaba,Green Park,Delhi,28.6749,77.2204,commercial
+LOC05,Crescent Mall,Market Road,Delhi,28.6406,77.1997,commercial
+LOC06,Old Bus Depot,Sector 22,Delhi,28.6729,77.2431,residential
+LOC07,Lakeside Residency,New Colony,Gurugram,28.4436,77.0411,office
+LOC08,Crescent Mall,Ring Road,Gurugram,28.4385,77.0437,warehouse
+LOC09,Blue Moon Restaurant,Sector 18,Gurugram,28.4401,77.0426,commercial
+LOC10,Central Market,New Colony,Ghaziabad,28.6524,77.4064,transport_hub
+LOC11,Riverside Warehouse,Station Road,Ghaziabad,28.6613,77.4731,restaurant
+LOC12,Palm Court Hotel,Station Road,Ghaziabad,28.6911,77.4601,public_place
+LOC13,Lakeside Residency,Central Avenue,Faridabad,28.4235,77.3487,residential
+LOC14,Freight Yard,Model Town,Faridabad,28.434,77.2864,commercial
+LOC15,Riverside Warehouse,Sector 22,Faridabad,28.4003,77.3383,residential
+LOC16,Transnational Freight Warehouse,Station Road,Delhi,28.6249,77.241,warehouse
+LOC17,Central Interstate Bus Terminal,Ring Road,Delhi,28.6393,77.234,transport_hub
+LOC18,Grand Junction Hotel,Model Town,Gurugram,28.4688,77.0015,hotel

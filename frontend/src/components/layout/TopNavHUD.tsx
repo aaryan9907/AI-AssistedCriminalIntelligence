@@ -58,9 +58,9 @@ export const TopNavHUD: React.FC<TopNavHUDProps> = ({
         <div className="text-right hidden sm:block">
           <div className="flex items-center gap-1.5 text-signal">
             <span className="size-1.5 rounded-full bg-signal shadow-[0_0_8px_var(--color-signal)]" />
-            ANTIGRAVITY FX
+            NETWORK ENGINE
           </div>
-          <div className="text-muted-foreground mt-0.5">CYBER CURSOR · ACTIVE</div>
+          <div className="text-muted-foreground mt-0.5">ADAPTIVE TOPOLOGY</div>
         </div>
 
         <div className="h-8 w-px bg-signal/15" />

@@ -1,0 +1,42 @@
+event_id,timestamp,event_type,location_id,case_id,description
+EVT001,2026-01-29T15:12:00.000Z,person_observation,LOC02,CASE01,A person of interest was briefly observed in the vicinity.
+EVT002,2026-02-09T10:41:00.000Z,person_observation,LOC01,CASE01,An individual was observed near the location during routine surveillance.
+EVT003,2026-02-13T10:38:00.000Z,transaction_event,LOC01,CASE01,A financial transaction linked to the case was recorded around this time.
+EVT004,2026-01-23T08:59:00.000Z,incident,LOC02,CASE02,A minor incident was reported and logged for review.
+EVT005,2026-02-24T16:09:00.000Z,transaction_event,LOC01,CASE02,A financial transaction linked to the case was recorded around this time.
+EVT006,2026-01-20T13:20:00.000Z,meeting,LOC02,CASE02,A meeting between two parties was noted at the location.
+EVT007,2026-02-10T13:09:00.000Z,vehicle_observation,LOC16,CASE03,Routine patrol noted a vehicle consistent with earlier reports.
+EVT008,2026-02-06T09:43:00.000Z,location_visit,LOC04,CASE03,A visit to the location was recorded as part of routine observation.
+EVT009,2026-02-03T08:57:00.000Z,communication_event,LOC04,CASE03,A call log entry aligns with activity reported at this location.
+EVT010,2026-02-11T11:34:00.000Z,vehicle_observation,LOC05,CASE04,A vehicle matching the case description was observed in the area.
+EVT011,2026-02-03T17:04:00.000Z,transaction_event,LOC05,CASE04,Bank records indicate activity consistent with this event window.
+EVT012,2026-03-01T10:22:00.000Z,meeting,LOC06,CASE04,Witnesses reported a brief meeting taking place nearby.
+EVT013,2026-02-21T14:32:00.000Z,transaction_event,LOC09,CASE05,A financial transaction linked to the case was recorded around this time.
+EVT014,2026-03-08T15:32:00.000Z,vehicle_observation,LOC07,CASE05,A vehicle matching the case description was observed in the area.
+EVT015,2026-02-22T16:03:00.000Z,location_visit,LOC07,CASE05,A visit to the location was recorded as part of routine observation.
+EVT016,2026-02-21T08:59:00.000Z,incident,LOC07,CASE05,An unusual occurrence was noted and flagged for follow-up.
+EVT017,2026-03-18T10:09:00.000Z,location_visit,LOC08,CASE06,A visit to the location was recorded as part of routine observation.
+EVT018,2026-03-02T08:14:00.000Z,person_observation,LOC07,CASE06,An individual was observed near the location during routine surveillance.
+EVT019,2026-03-02T10:10:00.000Z,communication_event,LOC08,CASE06,Phone records show communication activity coinciding with this event.
+EVT020,2026-04-05T16:20:00.000Z,person_observation,LOC11,CASE07,An individual was observed near the location during routine surveillance.
+EVT021,2026-03-08T13:04:00.000Z,transaction_event,LOC11,CASE07,Bank records indicate activity consistent with this event window.
+EVT022,2026-04-08T11:03:00.000Z,vehicle_observation,LOC10,CASE07,A vehicle matching the case description was observed in the area.
+EVT023,2026-03-11T11:40:00.000Z,meeting,LOC11,CASE08,Witnesses reported a brief meeting taking place nearby.
+EVT024,2026-03-17T14:49:00.000Z,person_observation,LOC12,CASE08,A person of interest was briefly observed in the vicinity.
+EVT025,2026-03-22T14:57:00.000Z,location_visit,LOC11,CASE08,Entry/exit activity at the location was logged.
+EVT026,2026-04-23T08:13:00.000Z,communication_event,LOC13,CASE09,A call log entry aligns with activity reported at this location.
+EVT027,2026-03-31T14:38:00.000Z,incident,LOC13,CASE09,An unusual occurrence was noted and flagged for follow-up.
+EVT028,2026-04-16T09:54:00.000Z,incident,LOC15,CASE09,A minor incident was reported and logged for review.
+EVT029,2026-03-27T08:49:00.000Z,communication_event,LOC14,CASE10,Phone records show communication activity coinciding with this event.
+EVT030,2026-04-28T12:58:00.000Z,meeting,LOC13,CASE10,A meeting between two parties was noted at the location.
+EVT031,2026-04-09T15:42:00.000Z,meeting,LOC14,CASE10,A meeting between two parties was noted at the location.
+EVT032,2026-05-01T14:54:00.000Z,transaction_event,LOC15,CASE10,Bank records indicate activity consistent with this event window.
+EVT033,2026-04-05T15:06:00.000Z,transaction_event,LOC16,CASE11,A financial transaction linked to the case was recorded around this time.
+EVT034,2026-04-15T16:58:00.000Z,incident,LOC04,CASE11,An unusual occurrence was noted and flagged for follow-up.
+EVT035,2026-04-09T08:37:00.000Z,location_visit,LOC16,CASE11,Entry/exit activity at the location was logged.
+EVT036,2026-04-23T11:56:00.000Z,transaction_event,LOC17,CASE12,Bank records indicate activity consistent with this event window.
+EVT037,2026-04-25T17:12:00.000Z,person_observation,LOC17,CASE12,A person of interest was briefly observed in the vicinity.
+EVT038,2026-05-09T14:45:00.000Z,incident,LOC16,CASE12,A minor incident was reported and logged for review.
+EVT039,2026-05-25T11:08:00.000Z,incident,LOC18,CASE13,A minor incident was reported and logged for review.
+EVT040,2026-05-10T13:06:00.000Z,location_visit,LOC18,CASE13,A visit to the location was recorded as part of routine observation.
+EVT041,2026-04-26T10:04:00.000Z,incident,LOC09,CASE13,A minor incident was reported and logged for review.

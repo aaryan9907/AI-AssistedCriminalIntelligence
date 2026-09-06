@@ -26,6 +26,7 @@ import {
   CATEGORY_META
 } from '../../services/deepAnalysisEngine';
 import { CyberBadge } from '../common/CyberBadge';
+import { apiService } from '../../services/api';
 
 interface HiddenRelationshipsDrawerProps {
   isOpen: boolean;
@@ -88,7 +89,7 @@ export const HiddenRelationshipsDrawer: React.FC<HiddenRelationshipsDrawerProps>
       const results = findConnectionsBetween(sourceEntityId, targetEntityId);
       setCustomPaths(results);
       setIsSearchingTargeted(false);
-    }, 200);
+    }, 150);
   };
 
   const getCategoryIcon = (category: HiddenRelationshipCategory) => {

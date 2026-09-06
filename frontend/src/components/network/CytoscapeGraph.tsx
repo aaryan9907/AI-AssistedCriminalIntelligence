@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import cytoscape, { Core, EventObject } from 'cytoscape';
 import { Entity, Relationship, EntityType } from '../../types/intel';
 import { 
@@ -13,7 +13,8 @@ import {
   Building2,
   ShieldAlert,
   Landmark,
-  Calendar
+  Calendar,
+  Activity
 } from 'lucide-react';
 
 interface CytoscapeGraphProps {
@@ -26,6 +27,101 @@ interface CytoscapeGraphProps {
   onSelectNode: (entityId: string) => void;
   onSelectEdge: (edgeId: string) => void;
   onClearSelection: () => void;
+}
+
+interface AdaptiveGraphConfig {
+  nodeBaseSize: number;
+  iconSize: number;
+  fontSize: string;
+  textMargin: number;
+  borderWidth: number;
+  edgeWidth: number;
+  edgeOpacity: number;
+  showEdgeLabels: boolean;
+  edgeFontSize: string;
+  idealEdgeLength: number;
+  nodeRepulsion: number;
+  componentSpacing: number;
+  padding: number;
+  densityLabel: string;
+  densityColor: string;
+}
+
+function getAdaptiveConfig(nodeCount: number, edgeCount: number): AdaptiveGraphConfig {
+  if (nodeCount <= 12) {
+    return {
+      nodeBaseSize: 56,
+      iconSize: 28,
+      fontSize: '11px',
+      textMargin: 8,
+      borderWidth: 2.5,
+      edgeWidth: 2.2,
+      edgeOpacity: 0.38,
+      showEdgeLabels: true,
+      edgeFontSize: '8.5px',
+      idealEdgeLength: 130,
+      nodeRepulsion: 7200,
+      componentSpacing: 100,
+      padding: 60,
+      densityLabel: 'FOCUSED CLUSTER',
+      densityColor: 'text-emerald-400'
+    };
+  }
+  if (nodeCount <= 30) {
+    return {
+      nodeBaseSize: 46,
+      iconSize: 22,
+      fontSize: '10px',
+      textMargin: 7,
+      borderWidth: 2.0,
+      edgeWidth: 1.7,
+      edgeOpacity: 0.28,
+      showEdgeLabels: edgeCount <= 45,
+      edgeFontSize: '8px',
+      idealEdgeLength: 95,
+      nodeRepulsion: 5400,
+      componentSpacing: 75,
+      padding: 45,
+      densityLabel: 'BALANCED TOPOLOGY',
+      densityColor: 'text-cyan-400'
+    };
+  }
+  if (nodeCount <= 75) {
+    return {
+      nodeBaseSize: 36,
+      iconSize: 18,
+      fontSize: '8.5px',
+      textMargin: 6,
+      borderWidth: 1.8,
+      edgeWidth: 1.2,
+      edgeOpacity: 0.20,
+      showEdgeLabels: false,
+      edgeFontSize: '7px',
+      idealEdgeLength: 70,
+      nodeRepulsion: 3800,
+      componentSpacing: 55,
+      padding: 35,
+      densityLabel: 'HIGH DENSITY CLUSTER',
+      densityColor: 'text-amber-400'
+    };
+  }
+  return {
+    nodeBaseSize: 28,
+    iconSize: 14,
+    fontSize: '7.5px',
+    textMargin: 5,
+    borderWidth: 1.4,
+    edgeWidth: 0.9,
+    edgeOpacity: 0.14,
+    showEdgeLabels: false,
+    edgeFontSize: '6.5px',
+    idealEdgeLength: 50,
+    nodeRepulsion: 2600,
+    componentSpacing: 40,
+    padding: 25,
+    densityLabel: 'MACRO ENTERPRISE GRAPH',
+    densityColor: 'text-purple-400'
+  };
 }
 
 const ENTITY_STYLES: Record<EntityType, { shape: string; bg: string; border: string }> = {
@@ -65,14 +161,32 @@ export const CytoscapeGraph: React.FC<CytoscapeGraphProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<Core | null>(null);
 
-  // Initialize and update Cytoscape instance
+  const nodeCount = entities.length;
+  const edgeCount = relationships.length;
+  const adaptive = useMemo(() => getAdaptiveConfig(nodeCount, edgeCount), [nodeCount, edgeCount]);
+
+  // Initialize and update Cytoscape instance with adaptive geometry
   useEffect(() => {
     if (!containerRef.current) return;
 
-    // Convert entities to Cytoscape nodes with custom SVG icons
+    // Calculate node degree for hub prominence weighting
+    const degreeMap: Record<string, number> = {};
+    relationships.forEach((r) => {
+      degreeMap[r.source] = (degreeMap[r.source] || 0) + 1;
+      degreeMap[r.target] = (degreeMap[r.target] || 0) + 1;
+    });
+
+    // Convert entities to Cytoscape nodes with adaptive dimensions
     const nodes = entities.map((entity) => {
       const style = ENTITY_STYLES[entity.type] || { shape: 'ellipse', bg: '#334155', border: '#94a3b8' };
       const icon = ENTITY_ICONS[entity.type] || ENTITY_ICONS.PERSON;
+      const deg = degreeMap[entity.id] || 0;
+
+      // Hub nodes scaled larger (+18%), isolated leaves scaled slightly smaller (-10%)
+      const sizeMultiplier = deg >= 6 ? 1.18 : (deg <= 1 && nodeCount > 15 ? 0.90 : 1.0);
+      const computedSize = Math.round(adaptive.nodeBaseSize * sizeMultiplier);
+      const computedIconSize = `${Math.round(adaptive.iconSize * sizeMultiplier)}px`;
+
       return {
         data: {
           id: entity.id,
@@ -83,11 +197,14 @@ export const CytoscapeGraph: React.FC<CytoscapeGraphProps> = ({
           shape: style.shape,
           nodeIcon: icon,
           risk: entity.riskScore || 50,
+          nodeSize: computedSize,
+          iconSize: computedIconSize,
+          degree: deg,
         },
       };
     });
 
-    // Convert relationships to Cytoscape edges
+    // Convert relationships to Cytoscape edges with adaptive styling
     const edges = relationships.map((rel) => ({
       data: {
         id: rel.id,
@@ -102,30 +219,30 @@ export const CytoscapeGraph: React.FC<CytoscapeGraphProps> = ({
       container: containerRef.current,
       elements: [...nodes, ...edges],
       style: [
-        // Base Node Style with Custom SVG Icon
+        // Adaptive Base Node Style
         {
           selector: 'node',
           style: {
             'background-color': 'data(bgColor)',
             'border-color': 'data(borderColor)',
-            'border-width': 2,
+            'border-width': adaptive.borderWidth,
             'shape': 'data(shape)' as any,
-            'width': 44,
-            'height': 44,
+            'width': 'data(nodeSize)' as any,
+            'height': 'data(nodeSize)' as any,
             'background-image': 'data(nodeIcon)',
             'background-fit': 'none',
-            'background-width': '22px',
-            'background-height': '22px',
+            'background-width': 'data(iconSize)' as any,
+            'background-height': 'data(iconSize)' as any,
             'background-image-opacity': 0.95,
             'background-position-x': '50%',
             'background-position-y': '50%',
             'label': 'data(label)',
             'color': '#e2e8f0',
             'font-family': 'Inter, sans-serif',
-            'font-size': '10px',
+            'font-size': adaptive.fontSize,
             'font-weight': 600,
             'text-valign': 'bottom',
-            'text-margin-y': 7,
+            'text-margin-y': adaptive.textMargin,
             'text-background-opacity': 0.88,
             'text-background-color': '#060a16',
             'text-background-padding': '3px',
@@ -137,20 +254,20 @@ export const CytoscapeGraph: React.FC<CytoscapeGraphProps> = ({
             'transition-duration': 0.3,
           },
         },
-        // Base Edge Style
+        // Adaptive Base Edge Style
         {
           selector: 'edge',
           style: {
-            'width': 1.5,
-            'line-color': 'rgba(0, 240, 255, 0.25)',
+            'width': adaptive.edgeWidth,
+            'line-color': `rgba(0, 240, 255, ${adaptive.edgeOpacity})`,
             'curve-style': 'bezier',
             'target-arrow-shape': 'triangle',
-            'target-arrow-color': 'rgba(0, 240, 255, 0.45)',
-            'arrow-scale': 0.8,
-            'label': 'data(label)',
+            'target-arrow-color': `rgba(0, 240, 255, ${Math.min(0.65, adaptive.edgeOpacity + 0.15)})`,
+            'arrow-scale': nodeCount > 50 ? 0.65 : 0.85,
+            'label': adaptive.showEdgeLabels ? 'data(label)' : '',
             'color': '#64748b',
             'font-family': 'JetBrains Mono, monospace',
-            'font-size': '8px',
+            'font-size': adaptive.edgeFontSize,
             'text-rotation': 'autorotate',
             'text-background-opacity': 0.8,
             'text-background-color': '#060a16',
@@ -159,18 +276,31 @@ export const CytoscapeGraph: React.FC<CytoscapeGraphProps> = ({
             'transition-duration': 0.3,
           },
         },
+        // Edge Hover / Selected Style (Reveals label even if hidden in dense mode!)
+        {
+          selector: 'edge:selected, edge.highlighted',
+          style: {
+            'width': Math.max(3.0, adaptive.edgeWidth * 2.2),
+            'line-color': '#00f0ff',
+            'target-arrow-color': '#00f0ff',
+            'arrow-scale': 1.1,
+            'opacity': 1.0,
+            'label': 'data(label)',
+            'color': '#00f0ff',
+            'z-index': 999,
+          },
+        },
         // Selected Node Style
         {
           selector: 'node:selected, node.highlighted',
           style: {
             'border-color': '#00f0ff',
-            'border-width': 4,
-            'width': 52,
-            'height': 52,
-            'background-width': '26px',
-            'background-height': '26px',
+            'border-width': Math.max(3, adaptive.borderWidth * 1.8),
+            'width': (ele: any) => Math.round((ele.data('nodeSize') || adaptive.nodeBaseSize) * 1.25),
+            'height': (ele: any) => Math.round((ele.data('nodeSize') || adaptive.nodeBaseSize) * 1.25),
             'color': '#00f0ff',
             'text-border-color': '#00f0ff',
+            'z-index': 999,
           },
         },
         // Discovered Path Node Style
@@ -178,28 +308,30 @@ export const CytoscapeGraph: React.FC<CytoscapeGraphProps> = ({
           selector: 'node.path-node',
           style: {
             'border-color': '#00f0ff',
-            'border-width': 4,
-            'width': 54,
-            'height': 54,
-            'background-width': '28px',
-            'background-height': '28px',
+            'border-width': Math.max(3.5, adaptive.borderWidth * 2),
+            'width': (ele: any) => Math.round((ele.data('nodeSize') || adaptive.nodeBaseSize) * 1.28),
+            'height': (ele: any) => Math.round((ele.data('nodeSize') || adaptive.nodeBaseSize) * 1.28),
             'color': '#00f0ff',
             'text-border-color': '#00f0ff',
             'background-color': '#0284c7',
+            'z-index': 999,
           },
         },
         // Discovered Path Edge Style
         {
           selector: 'edge.path-edge',
           style: {
-            'width': 4,
+            'width': Math.max(3.5, adaptive.edgeWidth * 2.5),
             'line-color': '#00f0ff',
             'line-style': 'dashed',
             'line-dash-pattern': [8, 4],
             'target-arrow-shape': 'triangle',
             'target-arrow-color': '#00f0ff',
             'arrow-scale': 1.2,
+            'label': 'data(label)',
             'color': '#00f0ff',
+            'opacity': 1.0,
+            'z-index': 999,
           },
         },
         // Dimmed State
@@ -212,15 +344,20 @@ export const CytoscapeGraph: React.FC<CytoscapeGraphProps> = ({
         {
           selector: 'edge.dimmed',
           style: {
-            'opacity': 0.08,
+            'opacity': 0.05,
           },
         },
       ],
       layout: {
         name: layoutName === 'cose' ? 'cose' : layoutName,
         animate: false,
-        padding: 40,
-        componentSpacing: 80,
+        padding: adaptive.padding,
+        nodeRepulsion: () => adaptive.nodeRepulsion,
+        idealEdgeLength: () => adaptive.idealEdgeLength,
+        componentSpacing: adaptive.componentSpacing,
+        nodeOverlap: nodeCount > 50 ? 10 : 25,
+        gravity: 0.25,
+        numIter: 1000,
       } as any,
     });
 
@@ -241,7 +378,35 @@ export const CytoscapeGraph: React.FC<CytoscapeGraphProps> = ({
       }
     });
 
+    // Hover effect on edges to reveal relationship label in dense graphs
+    cy.on('mouseover', 'edge', (evt: EventObject) => {
+      const edge = evt.target;
+      if (!edge.hasClass('dimmed')) {
+        edge.addClass('highlighted');
+      }
+    });
+
+    cy.on('mouseout', 'edge', (evt: EventObject) => {
+      const edge = evt.target;
+      if (!edge.selected()) {
+        edge.removeClass('highlighted');
+      }
+    });
+
     cyRef.current = cy;
+
+    // Automatic container resize observer
+    let resizeObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined' && containerRef.current) {
+      resizeObserver = new ResizeObserver(() => {
+        try {
+          cy.resize();
+        } catch {
+          // Cy might be disposed
+        }
+      });
+      resizeObserver.observe(containerRef.current);
+    }
 
     // Continuous Animation Loop for Connecting Thread Dashes
     let dashOffset = 0;
@@ -261,10 +426,11 @@ export const CytoscapeGraph: React.FC<CytoscapeGraphProps> = ({
     animFrameId = requestAnimationFrame(animateDashes);
 
     return () => {
+      if (resizeObserver) resizeObserver.disconnect();
       cancelAnimationFrame(animFrameId);
       cy.destroy();
     };
-  }, [entities, relationships, layoutName]);
+  }, [entities, relationships, layoutName, adaptive]);
 
   // Handle Selection & Dimming
   useEffect(() => {
@@ -284,7 +450,7 @@ export const CytoscapeGraph: React.FC<CytoscapeGraphProps> = ({
 
           cy.animate({
             center: { eles: selectedNode },
-            zoom: 1.3,
+            zoom: nodeCount > 50 ? 1.6 : 1.3,
             duration: 500,
           });
         }
@@ -297,9 +463,9 @@ export const CytoscapeGraph: React.FC<CytoscapeGraphProps> = ({
         }
       }
     });
-  }, [selectedEntityId, selectedEdgeId]);
+  }, [selectedEntityId, selectedEdgeId, nodeCount]);
 
-  // WOW MOMENT: Sequential Path Highlight Animation
+  // Sequential Path Highlight Animation with adaptive scaling
   useEffect(() => {
     const cy = cyRef.current;
     if (!cy || !highlightPath || highlightPath.length === 0) return;
@@ -325,6 +491,8 @@ export const CytoscapeGraph: React.FC<CytoscapeGraphProps> = ({
 
     let delay = 0;
     const stepDuration = 350;
+    const targetPulseSize = Math.round(adaptive.nodeBaseSize * 1.38);
+    const targetRestSize = Math.round(adaptive.nodeBaseSize * 1.24);
 
     highlightPath.forEach((nodeId, idx) => {
       setTimeout(() => {
@@ -334,15 +502,15 @@ export const CytoscapeGraph: React.FC<CytoscapeGraphProps> = ({
 
           node.animate({
             style: {
-              width: 60,
-              height: 60,
+              width: targetPulseSize,
+              height: targetPulseSize,
             },
             duration: 200,
             complete: () => {
               node.animate({
                 style: {
-                  width: 52,
-                  height: 52,
+                  width: targetRestSize,
+                  height: targetRestSize,
                 },
                 duration: 200,
               });
@@ -367,31 +535,39 @@ export const CytoscapeGraph: React.FC<CytoscapeGraphProps> = ({
       cy.animate({
         fit: {
           eles: allPathEles,
-          padding: 80,
+          padding: adaptive.padding + 30,
         },
         duration: 800,
       });
     }, delay + 200);
-  }, [highlightPath]);
+  }, [highlightPath, adaptive]);
 
   const handleZoomIn = () => cyRef.current?.zoom(cyRef.current.zoom() * 1.25);
   const handleZoomOut = () => cyRef.current?.zoom(cyRef.current.zoom() * 0.8);
-  const handleFit = () => cyRef.current?.fit(undefined, 50);
+  const handleFit = () => cyRef.current?.fit(undefined, adaptive.padding);
   const handleReset = () => {
     onClearSelection();
     cyRef.current?.elements().removeClass('highlighted dimmed path-node path-edge');
-    cyRef.current?.fit(undefined, 50);
+    cyRef.current?.fit(undefined, adaptive.padding);
   };
 
   return (
     <div className="relative w-full h-full bg-[#050813] overflow-hidden cyber-grid">
       <div className="absolute inset-0 scanline-overlay pointer-events-none" />
 
+      {/* Adaptive Topology Scale & Density Indicator */}
+      <div className="absolute top-4 left-4 z-20 flex items-center gap-2 bg-slate-950/85 px-3 py-1.5 rounded-lg border border-cyan-500/30 backdrop-blur-md text-[11px] font-mono shadow-lg shadow-black/50">
+        <Activity className={`w-3.5 h-3.5 ${adaptive.densityColor} animate-pulse`} />
+        <span className="text-slate-400">ADAPTIVE GRAPH:</span>
+        <span className={`font-semibold ${adaptive.densityColor}`}>{adaptive.densityLabel}</span>
+        <span className="text-slate-500 text-[10px]">({entities.length} nodes · {relationships.length} links)</span>
+      </div>
+
       {/* Cytoscape Canvas Container */}
       <div ref={containerRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
 
       {/* Floating Canvas Controls (HUD Overlay) */}
-      <div className="absolute top-4 right-4 z-20 flex flex-col gap-1.5 bg-slate-950/80 p-1.5 rounded-lg border border-cyan-500/30 backdrop-blur-md">
+      <div className="absolute top-4 right-4 z-20 flex flex-col gap-1.5 bg-slate-950/80 p-1.5 rounded-lg border border-cyan-500/30 backdrop-blur-md shadow-lg shadow-black/50">
         <button
           onClick={handleZoomIn}
           title="Zoom In"
@@ -423,7 +599,7 @@ export const CytoscapeGraph: React.FC<CytoscapeGraphProps> = ({
       </div>
 
       {/* Custom Icon Graph Legend Overlay at Bottom-Left */}
-      <div className="absolute bottom-4 left-4 z-20 hidden sm:flex items-center gap-2.5 px-3 py-1.5 rounded-lg bg-slate-950/90 border border-slate-800 text-[10px] font-mono text-slate-400 backdrop-blur-md overflow-x-auto no-scrollbar max-w-[calc(100%-100px)]">
+      <div className="absolute bottom-4 left-4 z-20 hidden sm:flex items-center gap-2.5 px-3 py-1.5 rounded-lg bg-slate-950/90 border border-slate-800 text-[10px] font-mono text-slate-400 backdrop-blur-md overflow-x-auto no-scrollbar max-w-[calc(100%-100px)] shadow-lg shadow-black/50">
         <span className="text-slate-500 font-bold uppercase shrink-0">ENTITY TAXONOMY:</span>
         <div className="flex items-center gap-1 shrink-0 text-blue-400">
           <User className="w-3 h-3" />

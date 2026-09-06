@@ -1,0 +1,11 @@
+organization_id,organization_name,organization_type,city,status
+ORG01,Sector18 Logistics Pvt Ltd,logistics_business,Noida,active
+ORG02,Silverline Traders Association,association,Noida,active
+ORG03,Riverside Transport Co,transport_business,Delhi,active
+ORG04,Blue Delta Enterprises,company,Delhi,active
+ORG05,Northside Financial Services,financial_business,Gurugram,active
+ORG06,Greenfield Warehousing,warehouse,Gurugram,active
+ORG07,Eastgate Freight Company,logistics_business,Ghaziabad,active
+ORG08,Crestview Holdings,company,Ghaziabad,active
+ORG09,Old Quarter Traders Circle,informal_group,Faridabad,active
+ORG10,Amberstone Warehousing,warehouse,Faridabad,closed

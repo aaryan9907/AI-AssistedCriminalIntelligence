@@ -23,6 +23,7 @@ import {
   PREBUILT_SAMPLE_FILES 
 } from '../../services/dataIngestionService';
 import { NEXUS_ENTITY_ICONS, NEXUS_ENTITY_TONES } from '../../services/nexusData';
+import { apiService } from '../../services/api';
 
 interface DataIngestionViewProps {
   stats?: any;
@@ -117,6 +118,11 @@ export const DataIngestionView: React.FC<DataIngestionViewProps> = ({
       // Store in state & apply to global intelligence platform
       setAnalyzedDataset(analyzed);
       applyAnalyzedDataset(analyzed);
+
+      // Sync with FastAPI Backend
+      apiService.ingestData({
+        files: fileArray.map((f) => ({ name: f.name, type: 'CSV', recordsCount: 50 }))
+      }).catch((e) => console.warn('Backend ingest sync deferred:', e));
 
       if (onIngestSuccess) {
         onIngestSuccess(analyzed.stats);
