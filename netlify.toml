@@ -1,0 +1,21 @@
+# Netlify Deployment Configuration (Frontend Only)
+# SIH26189 – AI-Assisted Criminal Intelligence & Link Discovery Platform
+
+[build]
+  base    = "frontend"
+  publish = "dist"
+  command = "npm run build"
+
+# Single-Page Application (SPA) Fallback
+[[redirects]]
+  from   = "/*"
+  to     = "/index.html"
+  status = 200
+
+# Security & Cache Control Headers
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
