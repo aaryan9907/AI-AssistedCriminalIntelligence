@@ -1,0 +1,8 @@
+backend/
+__pycache__/
+*.pyc
+.git/
+.github/
+.netlify/
+ALGORITHMIC_ARCHITECTURE_GUIDE.md
+BACKEND_SYSTEM_DOCUMENTATION.md
