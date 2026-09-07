@@ -82,14 +82,14 @@ export const NEXUS_STATS = [
 
 export const NEXUS_NODES: NexusNode[] = [
   { id: 'P-014', type: 'PERSON', name: 'Rahul Sharma', subtitle: 'Selected subject', x: 50, y: 45, connections: 12, cases: 4, riskScore: 78 },
-  { id: 'PH-021', type: 'PHONE', name: 'Phone X', subtitle: '+91 98••• 0421', x: 26, y: 23, connections: 8, cases: 2, riskScore: 65 },
-  { id: 'P-037', type: 'PERSON', name: 'Vikram Singh', subtitle: 'Resolved entity', x: 50, y: 18, connections: 9, cases: 3, riskScore: 82 },
-  { id: 'V-009', type: 'VEHICLE', name: 'Vehicle V', subtitle: 'MH 04 KX 231', x: 74, y: 23, connections: 6, cases: 2, riskScore: 54 },
-  { id: 'P-052', type: 'PERSON', name: 'Amit Kumar', subtitle: 'Potential linked subject', x: 82, y: 51, connections: 11, cases: 3, riskScore: 88 },
-  { id: 'L-008', type: 'LOCATION', name: 'Location Z', subtitle: 'Andheri East', x: 23, y: 73, connections: 14, cases: 5, riskScore: 40 },
-  { id: 'O-003', type: 'ORGANIZATION', name: 'Organization N', subtitle: 'Commercial entity', x: 52, y: 77, connections: 7, cases: 2, riskScore: 60 },
-  { id: 'C-142', type: 'CASE', name: 'Case CR-2026-0142', subtitle: 'Open investigation', x: 79, y: 77, connections: 18, cases: 1, riskScore: 95 },
-  { id: 'BA-11', type: 'BANK ACCOUNT', name: 'Account A', subtitle: '•••• 7712', x: 14, y: 49, connections: 5, cases: 1, riskScore: 70 },
+  { id: 'PH-021', type: 'PHONE', name: '+91 98201-00421 (Rahul\'s Phone)', subtitle: '+91 98201-00421 (Burner SIM)', x: 26, y: 23, connections: 8, cases: 2, riskScore: 65 },
+  { id: 'P-037', type: 'PERSON', name: 'Vikram Singh', subtitle: 'Syndicate Intermediary', x: 50, y: 18, connections: 9, cases: 3, riskScore: 82 },
+  { id: 'V-009', type: 'VEHICLE', name: 'Mahindra Scorpio (MH-04-KX-2311)', subtitle: 'MH 04 KX 2311 (Transit Asset)', x: 74, y: 23, connections: 6, cases: 2, riskScore: 54 },
+  { id: 'P-052', type: 'PERSON', name: 'Amit Kumar', subtitle: 'Syndicate Operator', x: 82, y: 51, connections: 11, cases: 3, riskScore: 88 },
+  { id: 'L-008', type: 'LOCATION', name: 'Andheri East Transit Terminal (LOC-08)', subtitle: 'Andheri East Transit Hub', x: 23, y: 73, connections: 14, cases: 5, riskScore: 40 },
+  { id: 'O-003', type: 'ORGANIZATION', name: 'Apex Global Logistics (ORG-03)', subtitle: 'Commercial Shell Entity', x: 52, y: 77, connections: 7, cases: 2, riskScore: 60 },
+  { id: 'C-142', type: 'CASE', name: 'Narcotics Trafficking Case (CR-2026-0142)', subtitle: 'Active Investigation Docket', x: 79, y: 77, connections: 18, cases: 1, riskScore: 95 },
+  { id: 'BA-11', type: 'BANK ACCOUNT', name: 'HDFC Bank (Vikram - Current)', subtitle: 'Account •••• 7712', x: 14, y: 49, connections: 5, cases: 1, riskScore: 70 },
 ];
 
 export const NEXUS_EDGES: NexusEdge[] = [
@@ -231,51 +231,52 @@ export const NEXUS_EVIDENCE: NexusEvidence[] = [
   { id: 'LOC-0052', type: 'Location trace', title: 'Location Z → Vehicle V', description: 'Toll plaza automated number plate recognition capture at Andheri junction.', date: '12 MAR 2026', time: '16:30', caseId: 'CR-2026-0142', confidence: 0.75, source: 'Highway toll system' }
 ];
 
-export const NEXUS_HIDDEN_PATH = ['P-014', 'PH-021', 'P-037', 'V-009', 'P-052'];
+export const NEXUS_HIDDEN_PATH = ['P003', 'PH003', 'PH010', 'P011', 'VH05', 'P020'];
 
 export const NEXUS_SUGGESTIONS: NexusSuggestion[] = [
   {
     id: 'sug-1',
-    title: 'Trace Multi-Hop Link: Rahul ↔ Amit',
+    title: 'Trace Multi-Hop Link: Garima ↔ Shailesh',
     category: 'LEAD',
-    description: 'Discovered 4-hop chain connecting Rahul Sharma with Amit Kumar through Phone X and Vehicle V.',
-    confidence: 0.87,
-    actionLabel: 'Analyze 4-Hop Path',
-    targetNodeId: 'P-014',
+    description: 'Discovered 5-hop indirect connection connecting Garima (P003) with Shailesh (P020) through burner phones and vehicle registry.',
+    confidence: 0.94,
+    actionLabel: 'Analyze 5-Hop Path',
+    targetNodeId: 'P003',
+    activeCategories: ['COMMUNICATION', 'VEHICLE'],
     stepAnimation: true,
   },
   {
     id: 'sug-2',
-    title: 'Isolate Vehicle V Bridge Nexus',
+    title: 'Isolate Vehicle UP16 Bridge Nexus',
     category: 'ANOMALY',
-    description: 'Vehicle V (MH 04 KX 231) bridges Vikram Singh & Amit Kumar across two disjoint surveillance records (#VEH-0231, #VEH-0240).',
-    confidence: 0.88,
+    description: 'Vehicle VH02 (UP 16 AA 1646) bridges Rashi & Deepak across disjoint surveillance logs and Case 04 docket.',
+    confidence: 0.89,
     actionLabel: 'Focus Vehicle Bridge',
-    targetNodeId: 'V-009',
-    activeCategories: ['VEHICLE', 'LOCATION'],
-    searchFilter: 'Vehicle V',
+    targetNodeId: 'VH02',
+    activeCategories: ['VEHICLE', 'CASE'],
+    searchFilter: 'UP16',
   },
   {
     id: 'sug-3',
-    title: 'Inspect Proxy Financial Transfer',
+    title: 'Inspect Proxy Wire Transfers (ACC05)',
     category: 'LEAD',
-    description: 'Account A executed wire transfers to Organization N (#FIN-0192) concurrent with executive board association by Vikram Singh.',
-    confidence: 0.83,
+    description: 'Account ACC05 (Metro Bank) executed recurring wire transfers linking Monika to Ritu via intermediary proxy accounts.',
+    confidence: 0.88,
     actionLabel: 'Filter Financial Ties',
-    targetNodeId: 'BA-11',
-    activeCategories: ['FINANCIAL', 'ORGANIZATION'],
-    searchFilter: 'Account A',
+    targetNodeId: 'ACC05',
+    activeCategories: ['FINANCIAL'],
+    searchFilter: 'ACC05',
   },
   {
     id: 'sug-4',
-    title: 'Telecom Burst Near Location Z',
+    title: 'Co-Location Rendezvous at Bus Terminal',
     category: 'VERIFY',
-    description: 'Phone X maintained rapid bidirectional voice and packet calls with Rahul Sharma and Vikram Singh near Andheri East.',
-    confidence: 0.94,
-    actionLabel: 'Filter Telecom CDR',
-    targetNodeId: 'PH-021',
-    activeCategories: ['COMMUNICATION'],
-    searchFilter: 'Phone X',
+    description: 'Location LOC09 (Interstate Bus Terminal) logs concurrent sightings connecting Sonali and Vikram.',
+    confidence: 0.91,
+    actionLabel: 'Filter Physical Presence',
+    targetNodeId: 'LOC09',
+    activeCategories: ['LOCATION'],
+    searchFilter: 'LOC09',
   }
 ];
 

@@ -141,15 +141,20 @@ class IntelGraphEngine:
             ph_id = row.get('phone_id') or row.get('phone_number')
             num = row.get('phone_number', ph_id).strip()
             owner = row.get('owner_person_id', '').strip() or row.get('subscriber_name', '').strip()
+            owner_ent = self.entities.get(owner)
+            owner_name = owner_ent['name'] if owner_ent else ""
+            display_num = f"+91 {num[:5]}-{num[5:]}" if len(num) == 10 else num
+            ph_name = f"{display_num} ({owner_name.split()[0]}'s Phone)" if owner_name else f"{display_num} (Mobile)"
             self.entities[ph_id] = {
                 "id": ph_id,
-                "name": f"Phone {ph_id} ({num})",
+                "name": ph_name,
                 "type": "PHONE",
                 "riskScore": 60,
                 "aliases": [row.get('imei', ''), row.get('imsi', '')],
                 "details": {
                     "phoneNumber": num,
                     "owner": owner,
+                    "ownerName": owner_name,
                     "activeFrom": row.get('active_from', row.get('first_seen', '')),
                     "activeTo": row.get('active_to', row.get('last_seen', ''))
                 },
@@ -197,15 +202,17 @@ class IntelGraphEngine:
             reg = row.get('registration_number') or v_id
             owner = row.get('owner_person_id', '').strip() or row.get('registered_owner', '').strip()
             user = row.get('primary_user_person_id', '').strip()
+            make_model = row.get('make_model', 'Vehicle')
+            reg_fmt = f"{reg[:4]}-{reg[4:6]}-{reg[6:]}" if len(reg) == 10 else reg
             self.entities[v_id] = {
                 "id": v_id,
-                "name": f"{row.get('make_model', 'Vehicle')} ({reg})",
+                "name": f"{make_model} ({reg_fmt})",
                 "type": "VEHICLE",
                 "riskScore": 65,
                 "aliases": [reg, row.get('chassis_number', '')],
                 "details": {
                     "registrationNumber": reg,
-                    "model": row.get('make_model', ''),
+                    "model": make_model,
                     "color": row.get('color', ''),
                     "owner": owner,
                     "primaryUser": user,
@@ -278,9 +285,10 @@ class IntelGraphEngine:
         # 6. cases
         for row in read_csv_dict('cases.csv'):
             c_id = row['case_id']
+            c_type = row.get('case_type', 'Investigation').replace('_', ' ').title()
             self.entities[c_id] = {
                 "id": c_id,
-                "name": f"Case {c_id} ({row.get('case_type', row.get('title', 'Investigation'))})",
+                "name": f"{c_type} Case ({c_id})",
                 "type": "CASE",
                 "riskScore": 90,
                 "aliases": [],
@@ -297,15 +305,20 @@ class IntelGraphEngine:
             acc_id = row['account_id']
             hp = row.get('account_holder_person_id', '').strip()
             ho = row.get('organization_id', '').strip()
+            bank_name = row.get('bank_name', 'Bank')
+            acc_type = row.get('account_type', 'Account').title()
+            holder_ent = self.entities.get(hp) or self.entities.get(ho)
+            holder_name = holder_ent['name'].split()[0] if holder_ent else ""
+            acc_display = f"{bank_name} ({acc_type})" if not holder_name else f"{bank_name} ({holder_name} - {acc_type})"
             self.entities[acc_id] = {
                 "id": acc_id,
-                "name": f"Account {acc_id} ({row.get('bank_name', 'Bank')})",
+                "name": acc_display,
                 "type": "BANK ACCOUNT",
                 "riskScore": 70,
                 "aliases": [],
                 "details": {
-                    "bank": row.get('bank_name', ''),
-                    "accountType": row.get('account_type', ''),
+                    "bank": bank_name,
+                    "accountType": acc_type,
                     "holderPerson": hp,
                     "holderOrg": ho
                 },

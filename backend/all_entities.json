@@ -1,0 +1,1199 @@
+{
+  "P001": {
+    "id": "P001",
+    "name": "Sneha Chawla",
+    "type": "PERSON",
+    "riskScore": 75,
+    "subtitle": "Noida"
+  },
+  "P002": {
+    "id": "P002",
+    "name": "Anirudh Naidu",
+    "type": "PERSON",
+    "riskScore": 75,
+    "subtitle": "Noida"
+  },
+  "P003": {
+    "id": "P003",
+    "name": "Garima Bhattacharya",
+    "type": "PERSON",
+    "riskScore": 75,
+    "subtitle": "Noida"
+  },
+  "P004": {
+    "id": "P004",
+    "name": "Omkar Rajagopalan",
+    "type": "PERSON",
+    "riskScore": 75,
+    "subtitle": "Noida"
+  },
+  "P005": {
+    "id": "P005",
+    "name": "Rashi Unnikrishnan",
+    "type": "PERSON",
+    "riskScore": 75,
+    "subtitle": "Noida"
+  },
+  "P006": {
+    "id": "P006",
+    "name": "Sanjit Ansari",
+    "type": "PERSON",
+    "riskScore": 75,
+    "subtitle": "Noida"
+  },
+  "P007": {
+    "id": "P007",
+    "name": "Monika Vaidyanathan",
+    "type": "PERSON",
+    "riskScore": 75,
+    "subtitle": "Noida"
+  },
+  "P008": {
+    "id": "P008",
+    "name": "Sudhir Bansal",
+    "type": "PERSON",
+    "riskScore": 75,
+    "subtitle": "Noida"
+  },
+  "P009": {
+    "id": "P009",
+    "name": "Mandira Raina",
+    "type": "PERSON",
+    "riskScore": 75,
+    "subtitle": "Noida"
+  },
+  "P010": {
+    "id": "P010",
+    "name": "Manav Kelkar",
+    "type": "PERSON",
+    "riskScore": 75,
+    "subtitle": "Delhi"
+  },
+  "P011": {
+    "id": "P011",
+    "name": "Surekha Bhardwaj",
+    "type": "PERSON",
+    "riskScore": 75,
+    "subtitle": "Delhi"
+  },
+  "P012": {
+    "id": "P012",
+    "name": "Vihaan Dutta",
+    "type": "PERSON",
+    "riskScore": 75,
+    "subtitle": "Delhi"
+  },
+  "P013": {
+    "id": "P013",
+    "name": "Parineeti Gupta",
+    "type": "PERSON",
+    "riskScore": 75,
+    "subtitle": "Delhi"
+  },
+  "P014": {
+    "id": "P014",
+    "name": "Anand Khanna",
+    "type": "PERSON",
+    "riskScore": 75,
+    "subtitle": "Delhi"
+  },
+  "P015": {
+    "id": "P015",
+    "name": "Sonali Raghavan",
+    "type": "PERSON",
+    "riskScore": 75,
+    "subtitle": "Delhi"
+  },
+  "P016": {
+    "id": "P016",
+    "name": "Mayank Upadhyay",
+    "type": "PERSON",
+    "riskScore": 75,
+    "subtitle": "Delhi"
+  },
+  "P017": {
+    "id": "P017",
+    "name": "Payal Menon",
+    "type": "PERSON",
+    "riskScore": 75,
+    "subtitle": "Delhi"
+  },
+  "P018": {
+    "id": "P018",
+    "name": "Uday Sanyal",
+    "type": "PERSON",
+    "riskScore": 75,
+    "subtitle": "Delhi"
+  },
+  "P019": {
+    "id": "P019",
+    "name": "Konkona Shankar",
+    "type": "PERSON",
+    "riskScore": 75,
+    "subtitle": "Gurugram"
+  },
+  "P020": {
+    "id": "P020",
+    "name": "Shailesh Arora",
+    "type": "PERSON",
+    "riskScore": 75,
+    "subtitle": "Gurugram"
+  },
+  "P021": {
+    "id": "P021",
+    "name": "Shalini Gopalan",
+    "type": "PERSON",
+    "riskScore": 75,
+    "subtitle": "Gurugram"
+  },
+  "P022": {
+    "id": "P022",
+    "name": "Ajay Kumar",
+    "type": "PERSON",
+    "riskScore": 75,
+    "subtitle": "Gurugram"
+  },
+  "P023": {
+    "id": "P023",
+    "name": "Neerja Choudhury",
+    "type": "PERSON",
+    "riskScore": 75,
+    "subtitle": "Gurugram"
+  },
+  "P024": {
+    "id": "P024",
+    "name": "Vinay Mohapatra",
+    "type": "PERSON",
+    "riskScore": 75,
+    "subtitle": "Gurugram"
+  },
+  "P025": {
+    "id": "P025",
+    "name": "Konkana Saini",
+    "type": "PERSON",
+    "riskScore": 75,
+    "subtitle": "Gurugram"
+  },
+  "P026": {
+    "id": "P026",
+    "name": "Madhav Pandey",
+    "type": "PERSON",
+    "riskScore": 75,
+    "subtitle": "Gurugram"
+  },
+  "P027": {
+    "id": "P027",
+    "name": "Kali Banerjee",
+    "type": "PERSON",
+    "riskScore": 75,
+    "subtitle": "Gurugram"
+  },
+  "P028": {
+    "id": "P028",
+    "name": "Suraj Kulkarni",
+    "type": "PERSON",
+    "riskScore": 75,
+    "subtitle": "Ghaziabad"
+  },
+  "P029": {
+    "id": "P029",
+    "name": "Dia Mehta",
+    "type": "PERSON",
+    "riskScore": 75,
+    "subtitle": "Ghaziabad"
+  },
+  "P030": {
+    "id": "P030",
+    "name": "Akash Swamy",
+    "type": "PERSON",
+    "riskScore": 75,
+    "subtitle": "Ghaziabad"
+  },
+  "P031": {
+    "id": "P031",
+    "name": "Esha Gopalakrishnan",
+    "type": "PERSON",
+    "riskScore": 75,
+    "subtitle": "Ghaziabad"
+  },
+  "P032": {
+    "id": "P032",
+    "name": "Himanshu Anantharaman",
+    "type": "PERSON",
+    "riskScore": 75,
+    "subtitle": "Ghaziabad"
+  },
+  "P033": {
+    "id": "P033",
+    "name": "Kareena Bhandari",
+    "type": "PERSON",
+    "riskScore": 75,
+    "subtitle": "Ghaziabad"
+  },
+  "P034": {
+    "id": "P034",
+    "name": "Mahesh Subramaniam",
+    "type": "PERSON",
+    "riskScore": 75,
+    "subtitle": "Ghaziabad"
+  },
+  "P035": {
+    "id": "P035",
+    "name": "Divya Subramanian",
+    "type": "PERSON",
+    "riskScore": 75,
+    "subtitle": "Ghaziabad"
+  },
+  "P036": {
+    "id": "P036",
+    "name": "Krishna Vohra",
+    "type": "PERSON",
+    "riskScore": 75,
+    "subtitle": "Ghaziabad"
+  },
+  "P037": {
+    "id": "P037",
+    "name": "Geeta Behera",
+    "type": "PERSON",
+    "riskScore": 75,
+    "subtitle": "Faridabad"
+  },
+  "P038": {
+    "id": "P038",
+    "name": "Umesh Gokhale",
+    "type": "PERSON",
+    "riskScore": 75,
+    "subtitle": "Faridabad"
+  },
+  "P039": {
+    "id": "P039",
+    "name": "Madhavi Mohammad",
+    "type": "PERSON",
+    "riskScore": 75,
+    "subtitle": "Faridabad"
+  },
+  "P040": {
+    "id": "P040",
+    "name": "Kartik Tiwari",
+    "type": "PERSON",
+    "riskScore": 75,
+    "subtitle": "Faridabad"
+  },
+  "P041": {
+    "id": "P041",
+    "name": "Archana Chatterjee",
+    "type": "PERSON",
+    "riskScore": 75,
+    "subtitle": "Faridabad"
+  },
+  "P042": {
+    "id": "P042",
+    "name": "Pratik Krishnamurthy",
+    "type": "PERSON",
+    "riskScore": 75,
+    "subtitle": "Faridabad"
+  },
+  "P043": {
+    "id": "P043",
+    "name": "Tarini Gupta",
+    "type": "PERSON",
+    "riskScore": 75,
+    "subtitle": "Faridabad"
+  },
+  "P044": {
+    "id": "P044",
+    "name": "Chandan Dhawan",
+    "type": "PERSON",
+    "riskScore": 75,
+    "subtitle": "Faridabad"
+  },
+  "P045": {
+    "id": "P045",
+    "name": "Leela Aggarwal",
+    "type": "PERSON",
+    "riskScore": 75,
+    "subtitle": "Faridabad"
+  },
+  "PH003": {
+    "id": "PH003",
+    "name": "+91 98773-97255 (Garima's Phone)",
+    "type": "PHONE",
+    "riskScore": 60,
+    "subtitle": "PHONE"
+  },
+  "PH010": {
+    "id": "PH010",
+    "name": "+91 74989-60600 (Surekha's Phone)",
+    "type": "PHONE",
+    "riskScore": 60,
+    "subtitle": "PHONE"
+  },
+  "PH004": {
+    "id": "PH004",
+    "name": "+91 78752-70817 (Omkar's Phone)",
+    "type": "PHONE",
+    "riskScore": 60,
+    "subtitle": "PHONE"
+  },
+  "PH029": {
+    "id": "PH029",
+    "name": "+91 78752-70817 (Suraj's Phone)",
+    "type": "PHONE",
+    "riskScore": 60,
+    "subtitle": "PHONE"
+  },
+  "PH020": {
+    "id": "PH020",
+    "name": "+91 83662-78794 (Ajay's Phone)",
+    "type": "PHONE",
+    "riskScore": 60,
+    "subtitle": "PHONE"
+  },
+  "PH021": {
+    "id": "PH021",
+    "name": "+91 83662-78794 (Vinay's Phone)",
+    "type": "PHONE",
+    "riskScore": 60,
+    "subtitle": "PHONE"
+  },
+  "PH001": {
+    "id": "PH001",
+    "name": "+91 96256-63408 (Monika's Phone)",
+    "type": "PHONE",
+    "riskScore": 60,
+    "subtitle": "PHONE"
+  },
+  "PH002": {
+    "id": "PH002",
+    "name": "+91 96634-85507 (Garima's Phone)",
+    "type": "PHONE",
+    "riskScore": 60,
+    "subtitle": "PHONE"
+  },
+  "PH005": {
+    "id": "PH005",
+    "name": "+91 77244-27023 (Rashi's Phone)",
+    "type": "PHONE",
+    "riskScore": 60,
+    "subtitle": "PHONE"
+  },
+  "PH006": {
+    "id": "PH006",
+    "name": "+91 79139-31238 (Mandira's Phone)",
+    "type": "PHONE",
+    "riskScore": 60,
+    "subtitle": "PHONE"
+  },
+  "PH007": {
+    "id": "PH007",
+    "name": "+91 87386-09388 (Anirudh's Phone)",
+    "type": "PHONE",
+    "riskScore": 60,
+    "subtitle": "PHONE"
+  },
+  "PH008": {
+    "id": "PH008",
+    "name": "+91 94749-18827 (Mandira's Phone)",
+    "type": "PHONE",
+    "riskScore": 60,
+    "subtitle": "PHONE"
+  },
+  "PH009": {
+    "id": "PH009",
+    "name": "+91 74300-75289 (Sonali's Phone)",
+    "type": "PHONE",
+    "riskScore": 60,
+    "subtitle": "PHONE"
+  },
+  "PH011": {
+    "id": "PH011",
+    "name": "+91 85004-72902 (Surekha's Phone)",
+    "type": "PHONE",
+    "riskScore": 60,
+    "subtitle": "PHONE"
+  },
+  "PH012": {
+    "id": "PH012",
+    "name": "+91 97849-34389 (Surekha's Phone)",
+    "type": "PHONE",
+    "riskScore": 60,
+    "subtitle": "PHONE"
+  },
+  "PH013": {
+    "id": "PH013",
+    "name": "+91 72001-77038 (Anand's Phone)",
+    "type": "PHONE",
+    "riskScore": 60,
+    "subtitle": "PHONE"
+  },
+  "PH014": {
+    "id": "PH014",
+    "name": "+91 85294-69534 (Manav's Phone)",
+    "type": "PHONE",
+    "riskScore": 60,
+    "subtitle": "PHONE"
+  },
+  "PH015": {
+    "id": "PH015",
+    "name": "+91 87468-19792 (Payal's Phone)",
+    "type": "PHONE",
+    "riskScore": 60,
+    "subtitle": "PHONE"
+  },
+  "PH016": {
+    "id": "PH016",
+    "name": "+91 70626-56326 (Payal's Phone)",
+    "type": "PHONE",
+    "riskScore": 60,
+    "subtitle": "PHONE"
+  },
+  "PH017": {
+    "id": "PH017",
+    "name": "+91 77781-72697 (Shailesh's Phone)",
+    "type": "PHONE",
+    "riskScore": 60,
+    "subtitle": "PHONE"
+  },
+  "PH018": {
+    "id": "PH018",
+    "name": "+91 76946-91821 (Madhav's Phone)",
+    "type": "PHONE",
+    "riskScore": 60,
+    "subtitle": "PHONE"
+  },
+  "PH019": {
+    "id": "PH019",
+    "name": "+91 82851-80304 (Shailesh's Phone)",
+    "type": "PHONE",
+    "riskScore": 60,
+    "subtitle": "PHONE"
+  },
+  "PH022": {
+    "id": "PH022",
+    "name": "+91 96058-48253 (Neerja's Phone)",
+    "type": "PHONE",
+    "riskScore": 60,
+    "subtitle": "PHONE"
+  },
+  "PH023": {
+    "id": "PH023",
+    "name": "+91 98395-50588 (Konkana's Phone)",
+    "type": "PHONE",
+    "riskScore": 60,
+    "subtitle": "PHONE"
+  },
+  "PH024": {
+    "id": "PH024",
+    "name": "+91 72182-53940 (Vinay's Phone)",
+    "type": "PHONE",
+    "riskScore": 60,
+    "subtitle": "PHONE"
+  },
+  "PH025": {
+    "id": "PH025",
+    "name": "+91 95638-49944 (Krishna's Phone)",
+    "type": "PHONE",
+    "riskScore": 60,
+    "subtitle": "PHONE"
+  },
+  "PH026": {
+    "id": "PH026",
+    "name": "+91 87376-90322 (Kareena's Phone)",
+    "type": "PHONE",
+    "riskScore": 60,
+    "subtitle": "PHONE"
+  },
+  "PH027": {
+    "id": "PH027",
+    "name": "+91 87739-06242 (Kareena's Phone)",
+    "type": "PHONE",
+    "riskScore": 60,
+    "subtitle": "PHONE"
+  },
+  "PH028": {
+    "id": "PH028",
+    "name": "+91 97174-58620 (Divya's Phone)",
+    "type": "PHONE",
+    "riskScore": 60,
+    "subtitle": "PHONE"
+  },
+  "PH030": {
+    "id": "PH030",
+    "name": "+91 99164-51186 (Dia's Phone)",
+    "type": "PHONE",
+    "riskScore": 60,
+    "subtitle": "PHONE"
+  },
+  "PH031": {
+    "id": "PH031",
+    "name": "+91 81225-39345 (Esha's Phone)",
+    "type": "PHONE",
+    "riskScore": 60,
+    "subtitle": "PHONE"
+  },
+  "PH032": {
+    "id": "PH032",
+    "name": "+91 79680-61618 (Suraj's Phone)",
+    "type": "PHONE",
+    "riskScore": 60,
+    "subtitle": "PHONE"
+  },
+  "PH033": {
+    "id": "PH033",
+    "name": "+91 98211-30848 (Geeta's Phone)",
+    "type": "PHONE",
+    "riskScore": 60,
+    "subtitle": "PHONE"
+  },
+  "PH034": {
+    "id": "PH034",
+    "name": "+91 86981-24599 (Geeta's Phone)",
+    "type": "PHONE",
+    "riskScore": 60,
+    "subtitle": "PHONE"
+  },
+  "PH035": {
+    "id": "PH035",
+    "name": "+91 75023-36752 (Geeta's Phone)",
+    "type": "PHONE",
+    "riskScore": 60,
+    "subtitle": "PHONE"
+  },
+  "PH036": {
+    "id": "PH036",
+    "name": "+91 80995-04984 (Pratik's Phone)",
+    "type": "PHONE",
+    "riskScore": 60,
+    "subtitle": "PHONE"
+  },
+  "PH037": {
+    "id": "PH037",
+    "name": "+91 76074-55893 (Archana's Phone)",
+    "type": "PHONE",
+    "riskScore": 60,
+    "subtitle": "PHONE"
+  },
+  "PH038": {
+    "id": "PH038",
+    "name": "+91 99138-58614 (Umesh's Phone)",
+    "type": "PHONE",
+    "riskScore": 60,
+    "subtitle": "PHONE"
+  },
+  "PH039": {
+    "id": "PH039",
+    "name": "+91 89255-41318 (Umesh's Phone)",
+    "type": "PHONE",
+    "riskScore": 60,
+    "subtitle": "PHONE"
+  },
+  "PH040": {
+    "id": "PH040",
+    "name": "+91 92814-69679 (Leela's Phone)",
+    "type": "PHONE",
+    "riskScore": 60,
+    "subtitle": "PHONE"
+  },
+  "VH02": {
+    "id": "VH02",
+    "name": "Hyundai i20 (UP16-AA-1646)",
+    "type": "VEHICLE",
+    "riskScore": 65,
+    "subtitle": "Hyundai i20"
+  },
+  "VH05": {
+    "id": "VH05",
+    "name": "Maruti Swift (DL01-WQ-8995)",
+    "type": "VEHICLE",
+    "riskScore": 65,
+    "subtitle": "Maruti Swift"
+  },
+  "VH11": {
+    "id": "VH11",
+    "name": "Bajaj Pulsar (UP14-YH-6937)",
+    "type": "VEHICLE",
+    "riskScore": 65,
+    "subtitle": "Bajaj Pulsar"
+  },
+  "VH17": {
+    "id": "VH17",
+    "name": "Tata Ace (DL09-DC-4652)",
+    "type": "VEHICLE",
+    "riskScore": 65,
+    "subtitle": "Tata Ace"
+  },
+  "VH01": {
+    "id": "VH01",
+    "name": "Maruti Alto (UP16-KL-0246)",
+    "type": "VEHICLE",
+    "riskScore": 65,
+    "subtitle": "Maruti Alto"
+  },
+  "VH03": {
+    "id": "VH03",
+    "name": "Honda Activa (UP16-QD-5347)",
+    "type": "VEHICLE",
+    "riskScore": 65,
+    "subtitle": "Honda Activa"
+  },
+  "VH04": {
+    "id": "VH04",
+    "name": "Royal Enfield Classic (DL01-UX-5951)",
+    "type": "VEHICLE",
+    "riskScore": 65,
+    "subtitle": "Royal Enfield Classic"
+  },
+  "VH06": {
+    "id": "VH06",
+    "name": "Maruti Alto (DL01-XU-8740)",
+    "type": "VEHICLE",
+    "riskScore": 65,
+    "subtitle": "Maruti Alto"
+  },
+  "VH07": {
+    "id": "VH07",
+    "name": "Maruti Alto (HR26-EP-0427)",
+    "type": "VEHICLE",
+    "riskScore": 65,
+    "subtitle": "Maruti Alto"
+  },
+  "VH08": {
+    "id": "VH08",
+    "name": "Tata Ace (HR26-KX-1002)",
+    "type": "VEHICLE",
+    "riskScore": 65,
+    "subtitle": "Tata Ace"
+  },
+  "VH09": {
+    "id": "VH09",
+    "name": "TVS Jupiter (HR26-BN-3197)",
+    "type": "VEHICLE",
+    "riskScore": 65,
+    "subtitle": "TVS Jupiter"
+  },
+  "VH10": {
+    "id": "VH10",
+    "name": "Mahindra Bolero (UP14-DM-1748)",
+    "type": "VEHICLE",
+    "riskScore": 65,
+    "subtitle": "Mahindra Bolero"
+  },
+  "VH12": {
+    "id": "VH12",
+    "name": "Bajaj Pulsar (UP14-XT-3969)",
+    "type": "VEHICLE",
+    "riskScore": 65,
+    "subtitle": "Bajaj Pulsar"
+  },
+  "VH13": {
+    "id": "VH13",
+    "name": "Honda Activa (HR29-VW-7750)",
+    "type": "VEHICLE",
+    "riskScore": 65,
+    "subtitle": "Honda Activa"
+  },
+  "VH14": {
+    "id": "VH14",
+    "name": "Honda Activa (HR29-MK-8341)",
+    "type": "VEHICLE",
+    "riskScore": 65,
+    "subtitle": "Honda Activa"
+  },
+  "VH15": {
+    "id": "VH15",
+    "name": "Maruti Swift (HR29-PH-1718)",
+    "type": "VEHICLE",
+    "riskScore": 65,
+    "subtitle": "Maruti Swift"
+  },
+  "VH16": {
+    "id": "VH16",
+    "name": "Toyota Innova (DL09-LY-9880)",
+    "type": "VEHICLE",
+    "riskScore": 65,
+    "subtitle": "Toyota Innova"
+  },
+  "VH18": {
+    "id": "VH18",
+    "name": "Mahindra Bolero (DL09-HF-2764)",
+    "type": "VEHICLE",
+    "riskScore": 65,
+    "subtitle": "Mahindra Bolero"
+  },
+  "LOC01": {
+    "id": "LOC01",
+    "name": "Crescent Mall",
+    "type": "LOCATION",
+    "riskScore": 45,
+    "subtitle": "Noida"
+  },
+  "LOC02": {
+    "id": "LOC02",
+    "name": "Palm Court Hotel",
+    "type": "LOCATION",
+    "riskScore": 45,
+    "subtitle": "Noida"
+  },
+  "LOC03": {
+    "id": "LOC03",
+    "name": "City Office Tower",
+    "type": "LOCATION",
+    "riskScore": 45,
+    "subtitle": "Noida"
+  },
+  "LOC04": {
+    "id": "LOC04",
+    "name": "Highway Dhaba",
+    "type": "LOCATION",
+    "riskScore": 45,
+    "subtitle": "Delhi"
+  },
+  "LOC05": {
+    "id": "LOC05",
+    "name": "Crescent Mall",
+    "type": "LOCATION",
+    "riskScore": 45,
+    "subtitle": "Delhi"
+  },
+  "LOC06": {
+    "id": "LOC06",
+    "name": "Old Bus Depot",
+    "type": "LOCATION",
+    "riskScore": 45,
+    "subtitle": "Delhi"
+  },
+  "LOC07": {
+    "id": "LOC07",
+    "name": "Lakeside Residency",
+    "type": "LOCATION",
+    "riskScore": 45,
+    "subtitle": "Gurugram"
+  },
+  "LOC08": {
+    "id": "LOC08",
+    "name": "Crescent Mall",
+    "type": "LOCATION",
+    "riskScore": 45,
+    "subtitle": "Gurugram"
+  },
+  "LOC09": {
+    "id": "LOC09",
+    "name": "Blue Moon Restaurant",
+    "type": "LOCATION",
+    "riskScore": 45,
+    "subtitle": "Gurugram"
+  },
+  "LOC10": {
+    "id": "LOC10",
+    "name": "Central Market",
+    "type": "LOCATION",
+    "riskScore": 45,
+    "subtitle": "Ghaziabad"
+  },
+  "LOC11": {
+    "id": "LOC11",
+    "name": "Riverside Warehouse",
+    "type": "LOCATION",
+    "riskScore": 45,
+    "subtitle": "Ghaziabad"
+  },
+  "LOC12": {
+    "id": "LOC12",
+    "name": "Palm Court Hotel",
+    "type": "LOCATION",
+    "riskScore": 45,
+    "subtitle": "Ghaziabad"
+  },
+  "LOC13": {
+    "id": "LOC13",
+    "name": "Lakeside Residency",
+    "type": "LOCATION",
+    "riskScore": 45,
+    "subtitle": "Faridabad"
+  },
+  "LOC14": {
+    "id": "LOC14",
+    "name": "Freight Yard",
+    "type": "LOCATION",
+    "riskScore": 45,
+    "subtitle": "Faridabad"
+  },
+  "LOC15": {
+    "id": "LOC15",
+    "name": "Riverside Warehouse",
+    "type": "LOCATION",
+    "riskScore": 45,
+    "subtitle": "Faridabad"
+  },
+  "LOC16": {
+    "id": "LOC16",
+    "name": "Transnational Freight Warehouse",
+    "type": "LOCATION",
+    "riskScore": 45,
+    "subtitle": "Delhi"
+  },
+  "LOC17": {
+    "id": "LOC17",
+    "name": "Central Interstate Bus Terminal",
+    "type": "LOCATION",
+    "riskScore": 45,
+    "subtitle": "Delhi"
+  },
+  "LOC18": {
+    "id": "LOC18",
+    "name": "Grand Junction Hotel",
+    "type": "LOCATION",
+    "riskScore": 45,
+    "subtitle": "Gurugram"
+  },
+  "ORG01": {
+    "id": "ORG01",
+    "name": "Sector18 Logistics Pvt Ltd",
+    "type": "ORGANIZATION",
+    "riskScore": 75,
+    "subtitle": "Noida"
+  },
+  "ORG02": {
+    "id": "ORG02",
+    "name": "Silverline Traders Association",
+    "type": "ORGANIZATION",
+    "riskScore": 75,
+    "subtitle": "Noida"
+  },
+  "ORG03": {
+    "id": "ORG03",
+    "name": "Riverside Transport Co",
+    "type": "ORGANIZATION",
+    "riskScore": 75,
+    "subtitle": "Delhi"
+  },
+  "ORG04": {
+    "id": "ORG04",
+    "name": "Blue Delta Enterprises",
+    "type": "ORGANIZATION",
+    "riskScore": 75,
+    "subtitle": "Delhi"
+  },
+  "ORG05": {
+    "id": "ORG05",
+    "name": "Northside Financial Services",
+    "type": "ORGANIZATION",
+    "riskScore": 75,
+    "subtitle": "Gurugram"
+  },
+  "ORG06": {
+    "id": "ORG06",
+    "name": "Greenfield Warehousing",
+    "type": "ORGANIZATION",
+    "riskScore": 75,
+    "subtitle": "Gurugram"
+  },
+  "ORG07": {
+    "id": "ORG07",
+    "name": "Eastgate Freight Company",
+    "type": "ORGANIZATION",
+    "riskScore": 75,
+    "subtitle": "Ghaziabad"
+  },
+  "ORG08": {
+    "id": "ORG08",
+    "name": "Crestview Holdings",
+    "type": "ORGANIZATION",
+    "riskScore": 75,
+    "subtitle": "Ghaziabad"
+  },
+  "ORG09": {
+    "id": "ORG09",
+    "name": "Old Quarter Traders Circle",
+    "type": "ORGANIZATION",
+    "riskScore": 75,
+    "subtitle": "Faridabad"
+  },
+  "ORG10": {
+    "id": "ORG10",
+    "name": "Amberstone Warehousing",
+    "type": "ORGANIZATION",
+    "riskScore": 75,
+    "subtitle": "Faridabad"
+  },
+  "CASE01": {
+    "id": "CASE01",
+    "name": "Theft Case (CASE01)",
+    "type": "CASE",
+    "riskScore": 90,
+    "subtitle": "CASE"
+  },
+  "CASE02": {
+    "id": "CASE02",
+    "name": "Fraud Case (CASE02)",
+    "type": "CASE",
+    "riskScore": 90,
+    "subtitle": "CASE"
+  },
+  "CASE03": {
+    "id": "CASE03",
+    "name": "Missing Property Case (CASE03)",
+    "type": "CASE",
+    "riskScore": 90,
+    "subtitle": "CASE"
+  },
+  "CASE04": {
+    "id": "CASE04",
+    "name": "Vehicle Related Case (CASE04)",
+    "type": "CASE",
+    "riskScore": 90,
+    "subtitle": "CASE"
+  },
+  "CASE05": {
+    "id": "CASE05",
+    "name": "Cyber Related Case (CASE05)",
+    "type": "CASE",
+    "riskScore": 90,
+    "subtitle": "CASE"
+  },
+  "CASE06": {
+    "id": "CASE06",
+    "name": "Financial Irregularity Case (CASE06)",
+    "type": "CASE",
+    "riskScore": 90,
+    "subtitle": "CASE"
+  },
+  "CASE07": {
+    "id": "CASE07",
+    "name": "Theft Case (CASE07)",
+    "type": "CASE",
+    "riskScore": 90,
+    "subtitle": "CASE"
+  },
+  "CASE08": {
+    "id": "CASE08",
+    "name": "Vehicle Related Case (CASE08)",
+    "type": "CASE",
+    "riskScore": 90,
+    "subtitle": "CASE"
+  },
+  "CASE09": {
+    "id": "CASE09",
+    "name": "Organized Activity Case (CASE09)",
+    "type": "CASE",
+    "riskScore": 90,
+    "subtitle": "CASE"
+  },
+  "CASE10": {
+    "id": "CASE10",
+    "name": "Missing Property Case (CASE10)",
+    "type": "CASE",
+    "riskScore": 90,
+    "subtitle": "CASE"
+  },
+  "CASE11": {
+    "id": "CASE11",
+    "name": "Unidentified Incident Case (CASE11)",
+    "type": "CASE",
+    "riskScore": 90,
+    "subtitle": "CASE"
+  },
+  "CASE12": {
+    "id": "CASE12",
+    "name": "Organized Activity Case (CASE12)",
+    "type": "CASE",
+    "riskScore": 90,
+    "subtitle": "CASE"
+  },
+  "CASE13": {
+    "id": "CASE13",
+    "name": "Financial Irregularity Case (CASE13)",
+    "type": "CASE",
+    "riskScore": 90,
+    "subtitle": "CASE"
+  },
+  "ACC05": {
+    "id": "ACC05",
+    "name": "Metro Cooperative Bank (Monika - Savings)",
+    "type": "BANK ACCOUNT",
+    "riskScore": 70,
+    "subtitle": "BANK ACCOUNT"
+  },
+  "ACC13": {
+    "id": "ACC13",
+    "name": "State Trust Bank (Konkana - Savings)",
+    "type": "BANK ACCOUNT",
+    "riskScore": 70,
+    "subtitle": "BANK ACCOUNT"
+  },
+  "ACC01": {
+    "id": "ACC01",
+    "name": "Metro Cooperative Bank (Garima - Current)",
+    "type": "BANK ACCOUNT",
+    "riskScore": 70,
+    "subtitle": "BANK ACCOUNT"
+  },
+  "ACC02": {
+    "id": "ACC02",
+    "name": "City Savings Bank (Sneha - Savings)",
+    "type": "BANK ACCOUNT",
+    "riskScore": 70,
+    "subtitle": "BANK ACCOUNT"
+  },
+  "ACC03": {
+    "id": "ACC03",
+    "name": "State Trust Bank (Omkar - Business)",
+    "type": "BANK ACCOUNT",
+    "riskScore": 70,
+    "subtitle": "BANK ACCOUNT"
+  },
+  "ACC04": {
+    "id": "ACC04",
+    "name": "Regional Growth Bank (Sneha - Current)",
+    "type": "BANK ACCOUNT",
+    "riskScore": 70,
+    "subtitle": "BANK ACCOUNT"
+  },
+  "ACC06": {
+    "id": "ACC06",
+    "name": "Union Horizon Bank (Anand - Business)",
+    "type": "BANK ACCOUNT",
+    "riskScore": 70,
+    "subtitle": "BANK ACCOUNT"
+  },
+  "ACC07": {
+    "id": "ACC07",
+    "name": "State Trust Bank (Anand - Business)",
+    "type": "BANK ACCOUNT",
+    "riskScore": 70,
+    "subtitle": "BANK ACCOUNT"
+  },
+  "ACC08": {
+    "id": "ACC08",
+    "name": "National Bridge Bank (Surekha - Business)",
+    "type": "BANK ACCOUNT",
+    "riskScore": 70,
+    "subtitle": "BANK ACCOUNT"
+  },
+  "ACC09": {
+    "id": "ACC09",
+    "name": "City Savings Bank (Payal - Business)",
+    "type": "BANK ACCOUNT",
+    "riskScore": 70,
+    "subtitle": "BANK ACCOUNT"
+  },
+  "ACC10": {
+    "id": "ACC10",
+    "name": "City Savings Bank (Sonali - Business)",
+    "type": "BANK ACCOUNT",
+    "riskScore": 70,
+    "subtitle": "BANK ACCOUNT"
+  },
+  "ACC11": {
+    "id": "ACC11",
+    "name": "National Bridge Bank (Vinay - Current)",
+    "type": "BANK ACCOUNT",
+    "riskScore": 70,
+    "subtitle": "BANK ACCOUNT"
+  },
+  "ACC12": {
+    "id": "ACC12",
+    "name": "National Bridge Bank (Ajay - Savings)",
+    "type": "BANK ACCOUNT",
+    "riskScore": 70,
+    "subtitle": "BANK ACCOUNT"
+  },
+  "ACC14": {
+    "id": "ACC14",
+    "name": "Metro Cooperative Bank (Madhav - Savings)",
+    "type": "BANK ACCOUNT",
+    "riskScore": 70,
+    "subtitle": "BANK ACCOUNT"
+  },
+  "ACC15": {
+    "id": "ACC15",
+    "name": "Regional Growth Bank (Kali - Business)",
+    "type": "BANK ACCOUNT",
+    "riskScore": 70,
+    "subtitle": "BANK ACCOUNT"
+  },
+  "ACC16": {
+    "id": "ACC16",
+    "name": "State Trust Bank (Suraj - Business)",
+    "type": "BANK ACCOUNT",
+    "riskScore": 70,
+    "subtitle": "BANK ACCOUNT"
+  },
+  "ACC17": {
+    "id": "ACC17",
+    "name": "City Savings Bank (Kareena - Savings)",
+    "type": "BANK ACCOUNT",
+    "riskScore": 70,
+    "subtitle": "BANK ACCOUNT"
+  },
+  "ACC18": {
+    "id": "ACC18",
+    "name": "City Savings Bank (Kareena - Business)",
+    "type": "BANK ACCOUNT",
+    "riskScore": 70,
+    "subtitle": "BANK ACCOUNT"
+  },
+  "ACC19": {
+    "id": "ACC19",
+    "name": "Metro Cooperative Bank (Dia - Current)",
+    "type": "BANK ACCOUNT",
+    "riskScore": 70,
+    "subtitle": "BANK ACCOUNT"
+  },
+  "ACC20": {
+    "id": "ACC20",
+    "name": "Union Horizon Bank (Esha - Savings)",
+    "type": "BANK ACCOUNT",
+    "riskScore": 70,
+    "subtitle": "BANK ACCOUNT"
+  },
+  "ACC21": {
+    "id": "ACC21",
+    "name": "National Bridge Bank (Madhavi - Savings)",
+    "type": "BANK ACCOUNT",
+    "riskScore": 70,
+    "subtitle": "BANK ACCOUNT"
+  },
+  "ACC22": {
+    "id": "ACC22",
+    "name": "Regional Growth Bank (Geeta - Savings)",
+    "type": "BANK ACCOUNT",
+    "riskScore": 70,
+    "subtitle": "BANK ACCOUNT"
+  },
+  "ACC23": {
+    "id": "ACC23",
+    "name": "Regional Growth Bank (Kartik - Current)",
+    "type": "BANK ACCOUNT",
+    "riskScore": 70,
+    "subtitle": "BANK ACCOUNT"
+  },
+  "ACC24": {
+    "id": "ACC24",
+    "name": "State Trust Bank (Leela - Current)",
+    "type": "BANK ACCOUNT",
+    "riskScore": 70,
+    "subtitle": "BANK ACCOUNT"
+  },
+  "ACC25": {
+    "id": "ACC25",
+    "name": "National Bridge Bank (Kartik - Current)",
+    "type": "BANK ACCOUNT",
+    "riskScore": 70,
+    "subtitle": "BANK ACCOUNT"
+  },
+  "ACC26": {
+    "id": "ACC26",
+    "name": "State Trust Bank (Payal - Current)",
+    "type": "BANK ACCOUNT",
+    "riskScore": 70,
+    "subtitle": "BANK ACCOUNT"
+  },
+  "ACC27": {
+    "id": "ACC27",
+    "name": "Metro Cooperative Bank (Umesh - Current)",
+    "type": "BANK ACCOUNT",
+    "riskScore": 70,
+    "subtitle": "BANK ACCOUNT"
+  }
+}

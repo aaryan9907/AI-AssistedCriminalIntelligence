@@ -59,9 +59,9 @@ function getAdaptiveConfig(nodeCount: number, edgeCount: number): AdaptiveGraphC
       edgeOpacity: 0.38,
       showEdgeLabels: true,
       edgeFontSize: '8.5px',
-      idealEdgeLength: 130,
-      nodeRepulsion: 7200,
-      componentSpacing: 100,
+      idealEdgeLength: 140,
+      nodeRepulsion: 9500,
+      componentSpacing: 110,
       padding: 60,
       densityLabel: 'FOCUSED CLUSTER',
       densityColor: 'text-emerald-400'
@@ -78,9 +78,9 @@ function getAdaptiveConfig(nodeCount: number, edgeCount: number): AdaptiveGraphC
       edgeOpacity: 0.28,
       showEdgeLabels: edgeCount <= 45,
       edgeFontSize: '8px',
-      idealEdgeLength: 95,
-      nodeRepulsion: 5400,
-      componentSpacing: 75,
+      idealEdgeLength: 125,
+      nodeRepulsion: 9000,
+      componentSpacing: 95,
       padding: 45,
       densityLabel: 'BALANCED TOPOLOGY',
       densityColor: 'text-cyan-400'
@@ -94,31 +94,31 @@ function getAdaptiveConfig(nodeCount: number, edgeCount: number): AdaptiveGraphC
       textMargin: 6,
       borderWidth: 1.8,
       edgeWidth: 1.2,
-      edgeOpacity: 0.20,
+      edgeOpacity: 0.22,
       showEdgeLabels: false,
       edgeFontSize: '7px',
-      idealEdgeLength: 70,
-      nodeRepulsion: 3800,
-      componentSpacing: 55,
-      padding: 35,
+      idealEdgeLength: 115,
+      nodeRepulsion: 10500,
+      componentSpacing: 85,
+      padding: 40,
       densityLabel: 'HIGH DENSITY CLUSTER',
       densityColor: 'text-amber-400'
     };
   }
   return {
-    nodeBaseSize: 28,
-    iconSize: 14,
-    fontSize: '7.5px',
-    textMargin: 5,
-    borderWidth: 1.4,
-    edgeWidth: 0.9,
-    edgeOpacity: 0.14,
+    nodeBaseSize: 30,
+    iconSize: 15,
+    fontSize: '8px',
+    textMargin: 6,
+    borderWidth: 1.5,
+    edgeWidth: 1.0,
+    edgeOpacity: 0.16,
     showEdgeLabels: false,
     edgeFontSize: '6.5px',
-    idealEdgeLength: 50,
-    nodeRepulsion: 2600,
-    componentSpacing: 40,
-    padding: 25,
+    idealEdgeLength: 125,
+    nodeRepulsion: 12500,
+    componentSpacing: 85,
+    padding: 35,
     densityLabel: 'MACRO ENTERPRISE GRAPH',
     densityColor: 'text-purple-400'
   };
@@ -243,6 +243,9 @@ export const CytoscapeGraph: React.FC<CytoscapeGraphProps> = ({
             'font-weight': 600,
             'text-valign': 'bottom',
             'text-margin-y': adaptive.textMargin,
+            'text-max-width': '85px',
+            'text-wrap': 'ellipsis',
+            'min-zoomed-font-size': 6,
             'text-background-opacity': 0.88,
             'text-background-color': '#060a16',
             'text-background-padding': '3px',
@@ -352,12 +355,15 @@ export const CytoscapeGraph: React.FC<CytoscapeGraphProps> = ({
         name: layoutName === 'cose' ? 'cose' : layoutName,
         animate: false,
         padding: adaptive.padding,
+        nodeDimensionsIncludeLabels: true,
         nodeRepulsion: () => adaptive.nodeRepulsion,
         idealEdgeLength: () => adaptive.idealEdgeLength,
         componentSpacing: adaptive.componentSpacing,
-        nodeOverlap: nodeCount > 50 ? 10 : 25,
-        gravity: 0.25,
-        numIter: 1000,
+        nodeOverlap: 4,
+        gravity: 0.18,
+        edgeElasticity: 32,
+        nestingFactor: 1.2,
+        numIter: 1200,
       } as any,
     });
 
@@ -443,10 +449,35 @@ export const CytoscapeGraph: React.FC<CytoscapeGraphProps> = ({
       if (selectedEntityId) {
         const selectedNode = cy.getElementById(selectedEntityId);
         if (selectedNode.length > 0) {
-          const neighborhood = selectedNode.neighborhood().add(selectedNode);
-          cy.elements().difference(neighborhood).addClass('dimmed');
+          let activeEles = selectedNode.neighborhood().add(selectedNode);
+
+          // If there is an active highlightPath, preserve all path nodes and edges so multi-hop links stay connected and visible
+          if (highlightPath && highlightPath.length > 0) {
+            highlightPath.forEach((id) => {
+              const pNode = cy.getElementById(id);
+              if (pNode.length > 0) {
+                activeEles = activeEles.add(pNode);
+                pNode.addClass('path-node');
+              }
+            });
+            for (let i = 0; i < highlightPath.length - 1; i++) {
+              const u = highlightPath[i];
+              const v = highlightPath[i + 1];
+              const pEdges = cy.edges().filter((e) => {
+                const s = e.data('source');
+                const t = e.data('target');
+                return (s === u && t === v) || (s === v && t === u);
+              });
+              if (pEdges.length > 0) {
+                activeEles = activeEles.add(pEdges);
+                pEdges.addClass('path-edge');
+              }
+            }
+          }
+
+          cy.elements().difference(activeEles).addClass('dimmed');
           selectedNode.addClass('highlighted');
-          neighborhood.edges().addClass('highlighted');
+          selectedNode.neighborhood().edges().addClass('highlighted');
 
           cy.animate({
             center: { eles: selectedNode },
@@ -463,7 +494,7 @@ export const CytoscapeGraph: React.FC<CytoscapeGraphProps> = ({
         }
       }
     });
-  }, [selectedEntityId, selectedEdgeId, nodeCount]);
+  }, [selectedEntityId, selectedEdgeId, nodeCount, highlightPath]);
 
   // Sequential Path Highlight Animation with adaptive scaling
   useEffect(() => {

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   ChevronDown, 
   Command, 
@@ -36,6 +36,7 @@ import { NetworkAnalyticsPanel } from '../network/NetworkAnalyticsPanel';
 import { EgoCentricRadialGraph } from '../network/EgoCentricRadialGraph';
 import { InvestigativeSuggestions } from '../network/InvestigativeSuggestions';
 import { EntityDetailCard } from '../network/EntityDetailCard';
+import { getCanonicalEntity, getEntityDisplayName } from '../../services/canonicalEntities';
 
 interface CommandCenterProps {
   stats?: any;
@@ -49,6 +50,90 @@ interface CommandCenterProps {
 }
 
 type GraphViewTab = 'CANVAS' | 'RADIAL' | 'ANALYTICS';
+
+export function formatNodeName(node: NexusNode, maxChars: number = 16): string {
+  // Always resolve to the human-readable actual name
+  let name = node.name || node.id;
+  if (
+    !name || 
+    name === node.id || 
+    /^Phone\s+PH/i.test(name) || 
+    /^Vehicle\s+VH/i.test(name) || 
+    /^Case\s+CASE/i.test(name) || 
+    /^Location\s+LOC/i.test(name) || 
+    /^Account\s+ACC/i.test(name)
+  ) {
+    const canonical = getCanonicalEntity(node.id);
+    if (canonical) {
+      name = canonical.name;
+    }
+  }
+
+  // If phone like: "+91 98773-97255 (Garima's Phone)"
+  const phoneOwnerMatch = name.match(/\((.+)'s Phone\)/i);
+  if (phoneOwnerMatch) {
+    return `${phoneOwnerMatch[1]}'s Phone`;
+  }
+  // If vehicle like: "Hyundai i20 (UP16-AA-1646)" or "Maruti Swift (DL01-WQ-8995)"
+  const modelMatch = name.match(/^([^(]+)\s*\(/);
+  if (modelMatch && (node.type === 'VEHICLE' || node.id?.startsWith('VH'))) {
+    return modelMatch[1].trim();
+  }
+  // If Case like: "Vehicle Related Case (CASE04)" or "Theft Case (CASE01)"
+  const caseMatch = name.match(/^([^(]+)\s*\(/);
+  if (caseMatch && (node.type === 'CASE' || node.id?.startsWith('CASE'))) {
+    return caseMatch[1].trim();
+  }
+  // If Bank Account: "Metro Cooperative Bank (Monika - Savings)"
+  const bankMatch = name.match(/^([^(]+)\s*\(/);
+  if (bankMatch && (node.type === 'BANK ACCOUNT' || node.id?.startsWith('ACC'))) {
+    const acctHolderMatch = name.match(/\((.+)\)/);
+    if (acctHolderMatch) {
+      return acctHolderMatch[1].trim();
+    }
+    return bankMatch[1].trim();
+  }
+  // If Location: "Central Interstate Bus Terminal" -> "Central Bus Terminal"
+  if (name.includes('Central Interstate Bus Terminal')) {
+    return 'Bus Terminal';
+  }
+  if (name.length > maxChars) {
+    const parts = name.split(' ');
+    if (parts.length > 1 && node.type === 'PERSON') {
+      return `${parts[0]} ${parts[1][0]}.`;
+    }
+    return `${name.slice(0, maxChars - 1)}…`;
+  }
+  return name;
+}
+
+export function formatNodeSubLabel(node: NexusNode): string {
+  let name = node.name || node.id;
+  if (!name || name === node.id) {
+    const canonical = getCanonicalEntity(node.id);
+    if (canonical) {
+      name = canonical.name;
+    }
+  }
+  // For phone: show the formatted number
+  const numMatch = name.match(/^(?:\+91\s*)?([0-9-]{10,14})/);
+  if (numMatch && (node.type === 'PHONE' || node.id?.startsWith('PH'))) {
+    return numMatch[1];
+  }
+  // For vehicle / case: show plate or docket in brackets
+  const regMatch = name.match(/\(([^)]+)\)/);
+  if (regMatch && (node.type === 'VEHICLE' || node.type === 'CASE' || node.type === 'BANK ACCOUNT' || node.id?.startsWith('VH') || node.id?.startsWith('CASE') || node.id?.startsWith('ACC'))) {
+    return regMatch[1];
+  }
+  if (node.type === 'PERSON' && node.subtitle && node.subtitle !== 'PERSON') {
+    return node.subtitle;
+  }
+  const canonical = getCanonicalEntity(node.id);
+  if (canonical?.subtitle && canonical.subtitle !== canonical.type) {
+    return canonical.subtitle;
+  }
+  return node.type;
+}
 
 const ALL_RELATION_CATEGORIES = [
   'COMMUNICATION',
@@ -74,6 +159,7 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
     activeHiddenRelationshipId,
     activeHiddenRelationship,
     setActiveHiddenRelationshipId,
+    trackEntityHiddenRelationship,
     activeDatasetName,
     isCustomDataset,
   } = useIntelData();
@@ -85,13 +171,42 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
   const allStats = intelStats.length > 0 ? intelStats : NEXUS_STATS;
   const allHiddenPath = hiddenPath.length > 0 ? hiddenPath : NEXUS_HIDDEN_PATH;
 
-  const leadRel = activeHiddenRelationship || hiddenRelationships[0] || null;
-  const effectiveLeadPath = leadRel?.pathNodeIds || allHiddenPath;
-
   // Navigation & Sub-view State
   const [activeTab, setActiveTab] = useState<GraphViewTab>('CANVAS');
   const [showSuggestions, setShowSuggestions] = useState<boolean>(true);
-  const [selectedId, setSelectedId] = useState<string>('P-014');
+  const [selectedId, setSelectedId] = useState<string>(allNodes[0]?.id || 'P003');
+
+  // Find matching hidden relationship for currently selected entity
+  const matchedRelForSelected = useMemo(() => {
+    if (!selectedId) return null;
+    return hiddenRelationships.find(
+      (r) => r.sourceNodeId === selectedId || r.targetNodeId === selectedId || (r.pathNodeIds && r.pathNodeIds.includes(selectedId)) || r.sourceId === selectedId || r.targetId === selectedId
+    ) || null;
+  }, [selectedId, hiddenRelationships]);
+
+  const leadRel = useMemo(() => {
+    if (matchedRelForSelected) return matchedRelForSelected;
+    if (activeHiddenRelationship && (
+      activeHiddenRelationship.sourceNodeId === selectedId ||
+      activeHiddenRelationship.targetNodeId === selectedId ||
+      activeHiddenRelationship.sourceId === selectedId ||
+      activeHiddenRelationship.targetId === selectedId ||
+      (activeHiddenRelationship.pathNodeIds && activeHiddenRelationship.pathNodeIds.includes(selectedId))
+    )) {
+      return activeHiddenRelationship;
+    }
+    const anyMatching = hiddenRelationships.find(
+      (r) => r.sourceId === selectedId || r.targetId === selectedId || (r.pathNodeIds && r.pathNodeIds.includes(selectedId))
+    );
+    return anyMatching || activeHiddenRelationship || hiddenRelationships[0] || null;
+  }, [matchedRelForSelected, activeHiddenRelationship, hiddenRelationships, selectedId]);
+
+  const effectiveLeadPath = useMemo(() => {
+    if (leadRel?.pathNodeIds && leadRel.pathNodeIds.length > 0) {
+      return leadRel.pathNodeIds;
+    }
+    return allHiddenPath;
+  }, [leadRel, allHiddenPath]);
 
   // Filter States
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -114,18 +229,82 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
   const [openDropdown, setOpenDropdown] = useState<'CASE' | 'SOURCE' | 'DATE' | 'DEPTH' | 'LIMIT' | null>(null);
 
   // Graph Animation States
-  const [pathProgress, setPathProgress] = useState<number>(allHiddenPath.length || 5);
+  const [pathProgress, setPathProgress] = useState<number>(effectiveLeadPath.length || 5);
+
+  // Synchronize pathProgress whenever effectiveLeadPath updates
+  useEffect(() => {
+    if (effectiveLeadPath && effectiveLeadPath.length > 0) {
+      setPathProgress(effectiveLeadPath.length);
+    }
+  }, [effectiveLeadPath]);
+
   const [analysisStep, setAnalysisStep] = useState<number>(0);
   const [activeModalRecordId, setActiveModalRecordId] = useState<string | null>(null);
   const [zoom, setZoom] = useState<number>(1);
+  const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState<boolean>(false);
+  const [dragStart, setDragStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  // Mouse Wheel Zoom Handler (0.4x to 3.0x)
+  const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.12 : 0.88;
+    setZoom((z) => Math.min(3.0, Math.max(0.4, Math.round(z * factor * 100) / 100)));
+  };
+
+  // Mouse Drag Pan Handlers
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    const target = e.target as HTMLElement | SVGElement;
+    if (target.closest('.graph-node') || target.closest('button')) return;
+    setIsPanning(true);
+    setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isPanning) return;
+    setPan({
+      x: e.clientX - dragStart.x,
+      y: e.clientY - dragStart.y,
+    });
+  };
+
+  const handleMouseUp = () => setIsPanning(false);
+
+  // Zoom Button Handlers
+  const handleZoomIn = () => setZoom((z) => Math.min(3.0, Math.round((z + 0.15) * 100) / 100));
+  const handleZoomOut = () => setZoom((z) => Math.max(0.4, Math.round((z - 0.15) * 100) / 100));
+  const handleResetZoom = () => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  };
+
   const [commandInput, setCommandInput] = useState<string>('');
   const [activeSuggestionId, setActiveSuggestionId] = useState<string | null>(null);
+
+  const [radialNodesCount, setRadialNodesCount] = useState<number>(15);
 
   // Selected Node Entity - ensure valid
   const effectiveSelectedId = useMemo(() => {
     if (allNodes.some((n) => n.id === selectedId)) return selectedId;
     return allNodes[0]?.id || 'P-014';
   }, [allNodes, selectedId]);
+
+  // Main Lead root entity for radial orbit anchoring
+  const mainLeadEntityId = useMemo(() => {
+    if (leadRel) {
+      return (
+        leadRel.sourceNodeId ||
+        leadRel.sourceId ||
+        leadRel.pathNodeIds?.[0] ||
+        effectiveSelectedId
+      );
+    }
+    if (effectiveLeadPath && effectiveLeadPath.length > 0) {
+      return effectiveLeadPath[0];
+    }
+    return effectiveSelectedId;
+  }, [leadRel, effectiveLeadPath, effectiveSelectedId]);
 
   const selectedEntity = useMemo(() => {
     return allNodes.find((e) => e.id === effectiveSelectedId) || allNodes[0];
@@ -163,7 +342,11 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
       if (!typeMatch) return false;
       if (!searchQuery.trim()) return true;
       const q = searchQuery.toLowerCase();
+      const displayName = getEntityDisplayName(node).toLowerCase();
+      const subLabel = formatNodeSubLabel(node).toLowerCase();
       return (
+        displayName.includes(q) ||
+        subLabel.includes(q) ||
         node.name.toLowerCase().includes(q) ||
         node.id.toLowerCase().includes(q) ||
         node.type.toLowerCase().includes(q)
@@ -182,9 +365,9 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
     return neighbors;
   }, [allEdges, selectedId, effectiveSelectedId]);
 
-  // Rank filteredNodes by importance: Selected > 1-Hop Neighbors > Search Match > Active Path > Connections > Risk
+  // Rank filteredNodes by importance: Selected > In Active Hidden Path > 1-Hop Neighbors > Search Match > Connections > Risk
   const rankedNodes = useMemo(() => {
-    const pathSet = new Set(allHiddenPath);
+    const pathSet = new Set(effectiveLeadPath);
     const focusId = selectedId || effectiveSelectedId;
     const q = searchQuery.trim().toLowerCase();
 
@@ -194,22 +377,22 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
       const bFocus = (b.id === focusId) ? 1 : 0;
       if (aFocus !== bFocus) return bFocus - aFocus;
 
-      // 2. Secondary: 1-hop neighbor of focused entity
+      // 2. Secondary: In active hidden path / investigative lead (prioritized over generic 1-hop neighbors)
+      const aPath = pathSet.has(a.id) ? 1 : 0;
+      const bPath = pathSet.has(b.id) ? 1 : 0;
+      if (aPath !== bPath) return bPath - aPath;
+
+      // 3. Tertiary: 1-hop neighbor of focused entity
       const aNbr = selectedNeighborIds.has(a.id) ? 1 : 0;
       const bNbr = selectedNeighborIds.has(b.id) ? 1 : 0;
       if (aNbr !== bNbr) return bNbr - aNbr;
 
-      // 3. Tertiary: Search query match
+      // 4. Quaternary: Search query match
       if (q) {
         const aMatch = (a.name.toLowerCase().includes(q) || a.id.toLowerCase().includes(q) || a.type.toLowerCase().includes(q)) ? 1 : 0;
         const bMatch = (b.name.toLowerCase().includes(q) || b.id.toLowerCase().includes(q) || b.type.toLowerCase().includes(q)) ? 1 : 0;
         if (aMatch !== bMatch) return bMatch - aMatch;
       }
-
-      // 4. Quaternary: In active hidden path / investigative lead
-      const aPath = pathSet.has(a.id) ? 1 : 0;
-      const bPath = pathSet.has(b.id) ? 1 : 0;
-      if (aPath !== bPath) return bPath - aPath;
 
       // 5. Quinary: Connection count / Degree centrality
       const connDiff = (b.connections || 0) - (a.connections || 0);
@@ -218,100 +401,220 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
       // 6. Senary: Risk score
       return (b.riskScore || 50) - (a.riskScore || 50);
     });
-  }, [filteredNodes, selectedId, effectiveSelectedId, selectedNeighborIds, searchQuery, allHiddenPath]);
+  }, [filteredNodes, selectedId, effectiveSelectedId, selectedNeighborIds, searchQuery, effectiveLeadPath]);
 
-  // Slice to active entity limit (default 15)
+  // Slice to active entity limit (default 15), but ALWAYS guarantee that all active path nodes are displayed
   const displayedNodes = useMemo(() => {
-    if (entityLimit === 'ALL') return rankedNodes;
-    return rankedNodes.slice(0, entityLimit);
-  }, [rankedNodes, entityLimit]);
+    const base = entityLimit === 'ALL' ? [...rankedNodes] : rankedNodes.slice(0, entityLimit);
+    const existingIds = new Set(base.map((n) => n.id));
+
+    // Ensure all nodes in effectiveLeadPath are displayed
+    effectiveLeadPath.forEach((id: string) => {
+      if (!existingIds.has(id)) {
+        const found = allNodes.find((n) => n.id === id);
+        if (found) {
+          base.push(found);
+          existingIds.add(id);
+        }
+      }
+    });
+    return base;
+  }, [rankedNodes, entityLimit, effectiveLeadPath, allNodes]);
 
   const displayedNodeIds = useMemo(() => {
     return new Set(displayedNodes.map((n) => n.id));
   }, [displayedNodes]);
 
-  // Canvas Edges: Only interconnect nodes that are both currently displayed
-  const canvasEdges = useMemo(() => {
-    return visibleEdges.filter(
-      (edge) => displayedNodeIds.has(edge.source) && displayedNodeIds.has(edge.target)
-    );
-  }, [visibleEdges, displayedNodeIds]);
+  // Consecutive path edges set for precision active edge highlighting
+  const consecutivePathEdges = useMemo(() => {
+    const set = new Set<string>();
+    for (let i = 0; i < effectiveLeadPath.length - 1; i++) {
+      const u = effectiveLeadPath[i];
+      const v = effectiveLeadPath[i + 1];
+      set.add(`${u}__${v}`);
+      set.add(`${v}__${u}`);
+    }
+    return set;
+  }, [effectiveLeadPath]);
 
-  // Clean, non-overlapping concentric layout for displayed nodes
-  const nodeLayout = useMemo(() => {
+  // Canvas Edges: Interconnect nodes that are both currently displayed, including all path edges of the active hidden relationship
+  const canvasEdges = useMemo(() => {
+    const existingPairs = new Set<string>();
+    const edges = visibleEdges.filter((edge) => {
+      existingPairs.add(`${edge.source}__${edge.target}`);
+      existingPairs.add(`${edge.target}__${edge.source}`);
+      return displayedNodeIds.has(edge.source) && displayedNodeIds.has(edge.target);
+    });
+
+    // Ensure all consecutive hops along the tracked hidden path are explicitly present in canvasEdges
+    const activePath = effectiveLeadPath || [];
+    for (let i = 0; i < activePath.length - 1; i++) {
+      const u = activePath[i];
+      const v = activePath[i + 1];
+      const pair = `${u}__${v}`;
+      if (!existingPairs.has(pair)) {
+        existingPairs.add(pair);
+        existingPairs.add(`${v}__${u}`);
+        const realEdge = allEdges.find(
+          (e) => (e.source === u && e.target === v) || (e.source === v && e.target === u)
+        );
+        if (realEdge) {
+          edges.push({
+            ...realEdge,
+            active: true
+          });
+        } else {
+          edges.push({
+            id: `edge-path-${u}-${v}`,
+            source: u,
+            target: v,
+            category: 'COMMUNICATION',
+            label: 'TRACKED_PATH_LINK',
+            confidence: 0.95,
+            recordId: `REC-${u}-${v}`,
+            caseId: leadRel?.caseDocket || 'CASE01',
+            sourceType: 'intelligence_provenance',
+            date: '2026-02-15',
+            active: true
+          } as any);
+        }
+      } else {
+        const match = edges.find(
+          (e) => (e.source === u && e.target === v) || (e.source === v && e.target === u)
+        );
+        if (match) {
+          match.active = true;
+        }
+      }
+    }
+
+    // Ensure the central selected node is physically connected to at least one visible node
+    const focusId = effectiveSelectedId;
+    const hasFocusEdge = edges.some(e => e.source === focusId || e.target === focusId);
+    if (!hasFocusEdge && displayedNodeIds.has(focusId)) {
+      const fallbackEdge = allEdges.find(
+        (e) => (e.source === focusId && displayedNodeIds.has(e.target)) ||
+               (e.target === focusId && displayedNodeIds.has(e.source))
+      );
+      if (fallbackEdge) {
+        edges.push({ ...fallbackEdge, active: true });
+      }
+    }
+
+    return edges;
+  }, [visibleEdges, displayedNodeIds, effectiveLeadPath, allEdges, leadRel, effectiveSelectedId]);
+
+  // Dynamic coordinate space and concentric layout for displayed nodes
+  const { nodeLayout, canvasDimension } = useMemo(() => {
+    const count = displayedNodes.length;
+    let dim = 100;
+    if (count > 50) dim = 300;
+    else if (count > 25) dim = 220;
+    else if (count > 12) dim = 160;
+
     const coords = new Map<string, { x: number; y: number }>();
-    if (displayedNodes.length === 0) return coords;
+    if (count === 0) return { nodeLayout: coords, canvasDimension: dim };
 
     // For default 9 nodes with no custom dataset, keep handcrafted positions
     if (nodes.length === 0 && allNodes.length <= 9) {
       displayedNodes.forEach((n) => coords.set(n.id, { x: n.x, y: n.y }));
-      return coords;
+      return { nodeLayout: coords, canvasDimension: 100 };
     }
 
+    const centerPos = dim / 2;
     // Central focus node: effectiveSelectedId if present in displayedNodes, otherwise #1 ranked node
     const center = displayedNodes.find((n) => n.id === effectiveSelectedId) || displayedNodes[0];
-    coords.set(center.id, { x: 50, y: 48 });
+    coords.set(center.id, { x: centerPos, y: centerPos });
 
     const others = displayedNodes.filter((n) => n.id !== center.id);
-    const count = others.length;
+    const pathSet = new Set(effectiveLeadPath);
 
-    if (count <= 8) {
-      // Single ring (Radius 27)
-      others.forEach((n, i) => {
-        const angle = (2 * Math.PI * i) / (count || 1) - Math.PI / 2;
+    // CRUCIAL: Sort path nodes in others strictly by their index in effectiveLeadPath!
+    const pathNodesInOthers = others
+      .filter((n) => pathSet.has(n.id))
+      .sort((a, b) => effectiveLeadPath.indexOf(a.id) - effectiveLeadPath.indexOf(b.id));
+
+    const nonPathNodes = others.filter((n) => !pathSet.has(n.id));
+
+    // Place path nodes in sequence along the upper arc so the hidden connection is immediately clear
+    if (pathNodesInOthers.length > 0) {
+      const pathRadius = dim * 0.32;
+      const arcStart = -Math.PI * 0.85;
+      const arcEnd = -Math.PI * 0.15;
+      pathNodesInOthers.forEach((n, idx) => {
+        const t = pathNodesInOthers.length === 1 ? 0.5 : idx / (pathNodesInOthers.length - 1);
+        const angle = arcStart + t * (arcEnd - arcStart);
         coords.set(n.id, {
-          x: Math.round(50 + 27 * Math.cos(angle)),
-          y: Math.round(48 + 27 * Math.sin(angle)),
-        });
-      });
-    } else if (count <= 18) {
-      // 2 concentric rings: Ring 1 (6 nodes, r=22), Ring 2 (rest, r=37)
-      const r1 = Math.min(6, Math.ceil(count * 0.4));
-      const r2 = count - r1;
-      others.slice(0, r1).forEach((n, i) => {
-        const angle = (2 * Math.PI * i) / (r1 || 1) - Math.PI / 2;
-        coords.set(n.id, {
-          x: Math.round(50 + 22 * Math.cos(angle)),
-          y: Math.round(48 + 22 * Math.sin(angle)),
-        });
-      });
-      others.slice(r1).forEach((n, i) => {
-        const angle = (2 * Math.PI * i) / (r2 || 1) - Math.PI / 4;
-        coords.set(n.id, {
-          x: Math.round(50 + 37 * Math.cos(angle)),
-          y: Math.round(48 + 37 * Math.sin(angle)),
-        });
-      });
-    } else {
-      // 3 concentric rings: Ring 1 (6, r=19), Ring 2 (12, r=31), Ring 3 (rest, r=42)
-      const r1 = 6;
-      const r2 = Math.min(12, count - r1);
-      const r3 = Math.max(1, count - r1 - r2);
-      others.slice(0, r1).forEach((n, i) => {
-        const angle = (2 * Math.PI * i) / (r1 || 1) - Math.PI / 2;
-        coords.set(n.id, {
-          x: Math.round(50 + 19 * Math.cos(angle)),
-          y: Math.round(48 + 19 * Math.sin(angle)),
-        });
-      });
-      others.slice(r1, r1 + r2).forEach((n, i) => {
-        const angle = (2 * Math.PI * i) / (r2 || 1) - Math.PI / 4;
-        coords.set(n.id, {
-          x: Math.round(50 + 31 * Math.cos(angle)),
-          y: Math.round(48 + 31 * Math.sin(angle)),
-        });
-      });
-      others.slice(r1 + r2).forEach((n, i) => {
-        const angle = (2 * Math.PI * i) / (r3 || 1) - Math.PI / 6;
-        coords.set(n.id, {
-          x: Math.round(50 + 42 * Math.cos(angle)),
-          y: Math.round(48 + 42 * Math.sin(angle)),
+          x: Math.round((centerPos + pathRadius * Math.cos(angle)) * 10) / 10,
+          y: Math.round((centerPos + pathRadius * Math.sin(angle)) * 10) / 10,
         });
       });
     }
 
-    return coords;
-  }, [displayedNodes, nodes.length, allNodes.length, effectiveSelectedId]);
+    // Distribute remaining non-path neighbors across lower and outer rings away from the upper path arc
+    const remCount = nonPathNodes.length;
+    if (remCount > 0) {
+      const hasPathArc = pathNodesInOthers.length > 0;
+      const rings = remCount > 30 ? 3 : remCount > 12 ? 2 : 1;
+      const ringRadii = rings === 1
+        ? [dim * 0.38]
+        : rings === 2
+        ? [dim * 0.30, dim * 0.44]
+        : [dim * 0.24, dim * 0.35, dim * 0.46];
+
+      const ringCapacities = rings === 1
+        ? [remCount]
+        : rings === 2
+        ? [Math.min(8, Math.ceil(remCount * 0.4)), remCount]
+        : [6, 12, remCount];
+
+      let allocated = 0;
+      for (let r = 0; r < rings; r++) {
+        const radius = ringRadii[r];
+        const maxInRing = ringCapacities[r];
+        const currentRingNodes = nonPathNodes.slice(allocated, allocated + maxInRing);
+        allocated += currentRingNodes.length;
+        const ringLen = currentRingNodes.length;
+
+        // If path nodes exist on upper arc, place non-path nodes along lower & lateral arc (0.05*PI to 0.95*PI)
+        const lowerStart = 0.05 * Math.PI;
+        const lowerEnd = 0.95 * Math.PI;
+
+        currentRingNodes.forEach((n, i) => {
+          let angle: number;
+          if (hasPathArc) {
+            const t = ringLen === 1 ? 0.5 : i / (ringLen - 1);
+            angle = lowerStart + t * (lowerEnd - lowerStart);
+          } else {
+            const startAngle = (r * Math.PI) / 6;
+            angle = startAngle + (2 * Math.PI * i) / (ringLen || 1);
+          }
+          coords.set(n.id, {
+            x: Math.round((centerPos + radius * Math.cos(angle)) * 10) / 10,
+            y: Math.round((centerPos + radius * Math.sin(angle)) * 10) / 10,
+          });
+        });
+        if (allocated >= remCount) break;
+      }
+    }
+
+    return { nodeLayout: coords, canvasDimension: dim };
+  }, [displayedNodes, nodes.length, allNodes.length, effectiveSelectedId, effectiveLeadPath]);
+
+  // Dynamic visual sizing to prevent text & circle overlapping
+  const densityScale = useMemo(() => {
+    const count = displayedNodes.length;
+    if (count <= 10) {
+      return { nodeR: 4.2, activeR: 5.6, strokeW: 0.35, labelY: 8.5, fontSize: 2.1, maxChars: 18, showType: true, badgeScale: 1.0 };
+    }
+    if (count <= 25) {
+      return { nodeR: 3.4, activeR: 4.6, strokeW: 0.30, labelY: 7.2, fontSize: 1.8, maxChars: 14, showType: true, badgeScale: 0.9 };
+    }
+    if (count <= 50) {
+      return { nodeR: 2.6, activeR: 3.6, strokeW: 0.25, labelY: 5.8, fontSize: 1.4, maxChars: 11, showType: false, badgeScale: 0.75 };
+    }
+    return { nodeR: 2.0, activeR: 2.8, strokeW: 0.20, labelY: 4.6, fontSize: 1.15, maxChars: 9, showType: false, badgeScale: 0.65 };
+  }, [displayedNodes.length]);
 
   // Nodes currently connected by visible edges or searched
   const visibleNodeIds = useMemo(() => {
@@ -325,18 +628,96 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
   }, [visibleEdges, filteredNodes]);
 
   const pathNodeIds = useMemo(() => {
-    return new Set(allHiddenPath.slice(0, pathProgress));
-  }, [allHiddenPath, pathProgress]);
+    return new Set(effectiveLeadPath.slice(0, pathProgress));
+  }, [effectiveLeadPath, pathProgress]);
 
   const activeModalRecord = useMemo(() => {
     return allEvidence.find((e) => e.id === activeModalRecordId) || null;
   }, [allEvidence, activeModalRecordId]);
 
+  // Dynamic investigation query suggestions derived from active dataset
+  const dataDrivenSuggestions = useMemo(() => {
+    const list: { label: string; query: string; targetId: string; categories?: string[]; tone: 'signal' | 'safe' | 'azure' | 'warn' }[] = [];
+
+    // 1. POI multi-hop bridge
+    const p3 = allNodes.find((n) => n.id === 'P003' || n.name.toLowerCase().includes('garima'));
+    const p20 = allNodes.find((n) => n.id === 'P020' || n.name.toLowerCase().includes('shailesh'));
+    if (p3) {
+      const p3Name = getEntityDisplayName(p3);
+      const p20Name = p20 ? getEntityDisplayName(p20) : '';
+      list.push({
+        label: p20 ? `Trace ${p3Name.split(' ')[0]} ↔ ${p20Name.split(' ')[0]} 5-hop bridge` : `Trace ${p3Name} Hidden Links`,
+        query: `Trace multi-hop path from ${p3Name} to ${p20 ? p20Name : 'syndicate'}`,
+        targetId: p3.id,
+        categories: ['COMMUNICATION', 'VEHICLE'],
+        tone: 'signal',
+      });
+    }
+
+    // 2. Vehicle nexus to Case
+    const vh = allNodes.find((n) => n.id === 'VH02' || n.name.includes('UP16') || n.type === 'VEHICLE');
+    const p5 = allNodes.find((n) => n.id === 'P005' || n.name.toLowerCase().includes('rashi'));
+    if (vh) {
+      const vhName = getEntityDisplayName(vh);
+      list.push({
+        label: `Vehicle ${vhName} Case Nexus`,
+        query: `Investigate vehicle ${vhName} links to Case 04`,
+        targetId: p5 ? p5.id : vh.id,
+        categories: ['VEHICLE', 'CASE'],
+        tone: 'safe',
+      });
+    }
+
+    // 3. Banking wire bridge
+    const acc = allNodes.find((n) => n.id === 'ACC05' || n.type === 'BANK ACCOUNT');
+    const p7 = allNodes.find((n) => n.id === 'P007' || n.name.toLowerCase().includes('monika'));
+    if (acc) {
+      const accName = getEntityDisplayName(acc);
+      list.push({
+        label: `Wire Transfers: ${accName.split('(')[0].trim()}`,
+        query: `Trace financial fund flows through ${accName}`,
+        targetId: p7 ? p7.id : acc.id,
+        categories: ['FINANCIAL'],
+        tone: 'azure',
+      });
+    }
+
+    // 4. Location rendezvous
+    const loc = allNodes.find((n) => n.id === 'LOC09' || n.type === 'LOCATION');
+    const p15 = allNodes.find((n) => n.id === 'P015' || n.name.toLowerCase().includes('sonali'));
+    if (loc) {
+      const locName = getEntityDisplayName(loc);
+      list.push({
+        label: `Co-location at ${locName.length > 20 ? locName.slice(0, 18) + '…' : locName}`,
+        query: `Analyze physical rendezvous at location ${locName}`,
+        targetId: p15 ? p15.id : loc.id,
+        categories: ['LOCATION'],
+        tone: 'warn',
+      });
+    }
+
+    // Fallback: If custom dataset with other entities
+    if (list.length < 3 && allNodes.length >= 2) {
+      const topEntities = [...allNodes].sort((a, b) => b.connections - a.connections).slice(0, 3);
+      topEntities.forEach((ent, i) => {
+        const entName = getEntityDisplayName(ent);
+        list.push({
+          label: `Investigate Hub: ${entName}`,
+          query: `Focus entity hub ${entName}`,
+          targetId: ent.id,
+          tone: i === 0 ? 'signal' : i === 1 ? 'safe' : 'azure',
+        });
+      });
+    }
+
+    return list.slice(0, 4);
+  }, [allNodes]);
+
   // Stepper Animation
   const runAnalysis = () => {
     setAnalysisStep(1);
     setPathProgress(1);
-    const stepsCount = Math.max(2, allHiddenPath.length);
+    const stepsCount = Math.max(2, effectiveLeadPath.length);
     Array.from({ length: stepsCount - 1 }).forEach((_, idx) => {
       const step = idx + 2;
       window.setTimeout(() => {
@@ -348,9 +729,35 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
 
   const [inspectingEntityId, setInspectingEntityId] = useState<string | null>(null);
 
-  const handleEntitySelect = (entityId: string) => {
+  const handleEntitySelect = async (entityId: string) => {
     setSelectedId(entityId);
     setInspectingEntityId(entityId);
+
+    // Correlate with known hidden relationships or dynamically track from intelligence engine
+    if (trackEntityHiddenRelationship) {
+      try {
+        const activeRel = await trackEntityHiddenRelationship(entityId);
+        if (activeRel && activeRel.pathNodeIds) {
+          setPathProgress(activeRel.pathNodeIds.length);
+        }
+      } catch (err) {
+        console.warn('Error tracking entity hidden relationship:', err);
+      }
+    } else {
+      const matchingRel = hiddenRelationships.find((r) =>
+        r.sourceNodeId === entityId ||
+        r.targetNodeId === entityId ||
+        r.sourceId === entityId ||
+        r.targetId === entityId ||
+        (r.pathNodeIds && r.pathNodeIds.includes(entityId))
+      );
+
+      if (matchingRel) {
+        setActiveHiddenRelationshipId(matchingRel.id);
+        setPathProgress(matchingRel.pathNodeIds.length);
+      }
+    }
+
     if (onSelectEntity) {
       onSelectEntity(entityId);
     }
@@ -443,9 +850,9 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
       </section>
 
       {/* Main Knowledge Graph Section (Left 8 Columns) */}
-      <section className="col-span-12 xl:col-span-8 glass rounded-xl p-4 relative overflow-hidden min-h-[610px] flex flex-col justify-between">
+      <section className="col-span-12 xl:col-span-8 glass rounded-xl p-4 relative overflow-hidden flex flex-col gap-3 min-h-[560px]">
         {/* Top Header with Multi-Graph Sub-View Switcher & Actions */}
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-3 px-1">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-1">
           <div>
             <div className="text-[10px] tracking-[0.22em] font-mono text-signal/70">
               KNOWLEDGE GRAPH
@@ -456,11 +863,11 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
                 {canvasEdges.length} active edges
               </span>
               <span className="text-muted-foreground text-[11px] font-mono">
-                · Showing <span className="text-signal font-semibold">{displayedNodes.length}</span> of {allNodes.length} entities
+                · Showing <span className="text-signal font-semibold">{activeTab === 'RADIAL' ? radialNodesCount : displayedNodes.length}</span> of {allNodes.length} entities
               </span>
-              {displayedNodes.length < allNodes.length && (
+              {(activeTab === 'RADIAL' ? radialNodesCount : displayedNodes.length) < allNodes.length && (
                 <span className="text-[9px] font-mono text-safe bg-safe/10 border border-safe/25 px-1.5 py-0.5 rounded">
-                  KEY HUBS ONLY
+                  {activeTab === 'RADIAL' ? 'RADIAL ORBIT' : 'KEY HUBS ONLY'}
                 </span>
               )}
             </div>
@@ -542,7 +949,10 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
         </div>
 
         {/* Dynamic Graph Canvas or Sub-Graph View */}
-        <div className="relative h-[520px] rounded-lg bg-void/60 border border-signal/10 overflow-hidden grid-bg">
+        <div 
+          className="relative h-[530px] rounded-lg bg-void/60 border border-signal/10 overflow-hidden grid-bg"
+          onWheel={activeTab === 'CANVAS' ? handleWheel : undefined}
+        >
           {activeTab === 'CANVAS' && (
             <>
               <div className="absolute inset-0 graph-vignette pointer-events-none" />
@@ -552,9 +962,17 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
               </div>
 
               <svg
-                viewBox="0 0 100 100"
-                className="absolute inset-0 size-full transition-transform duration-500"
-                style={{ transform: `scale(${zoom})` }}
+                viewBox={`0 0 ${canvasDimension} ${canvasDimension}`}
+                className={`absolute inset-0 size-full select-none ${isPanning ? 'cursor-grabbing' : 'cursor-grab'}`}
+                style={{ 
+                  transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                  transformOrigin: 'center center',
+                  transition: isPanning ? 'none' : 'transform 0.2s ease-out'
+                }}
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseUp}
                 aria-label="Interactive entity relationship graph"
               >
                 {/* Glow Filters for Animated Threads & Photons */}
@@ -582,8 +1000,15 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
                   const srcPos = nodeLayout.get(edge.source) || (srcNode ? { x: srcNode.x, y: srcNode.y } : null);
                   const tgtPos = nodeLayout.get(edge.target) || (tgtNode ? { x: tgtNode.x, y: tgtNode.y } : null);
                   if (!srcPos || !tgtPos) return null;
-                  const isPathActive = pathNodeIds.has(edge.source) && pathNodeIds.has(edge.target);
-                  const durationSec = isPathActive ? 1.6 : 3.2 + (idx % 4) * 0.7;
+                  const isConsecutive = consecutivePathEdges.has(`${edge.source}__${edge.target}`);
+                  const isPathActive = isConsecutive && pathNodeIds.has(edge.source) && pathNodeIds.has(edge.target);
+
+                  // Ensure photon travels in the forward direction of effectiveLeadPath
+                  const sIdx = effectiveLeadPath.indexOf(edge.source);
+                  const tIdx = effectiveLeadPath.indexOf(edge.target);
+                  const [fromPos, toPos] = (sIdx !== -1 && tIdx !== -1 && sIdx > tIdx)
+                    ? [tgtPos, srcPos]
+                    : [srcPos, tgtPos];
 
                   return (
                     <g
@@ -593,15 +1018,29 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
                       style={{ outline: 'none' }}
                     >
                       {/* Structural Base Thread */}
-                      <line x1={srcPos.x} y1={srcPos.y} x2={tgtPos.x} y2={tgtPos.y} className="thread-base" />
+                      <line
+                        x1={srcPos.x}
+                        y1={srcPos.y}
+                        x2={tgtPos.x}
+                        y2={tgtPos.y}
+                        className="thread-base"
+                        style={{ strokeWidth: `${densityScale.strokeW}px` }}
+                      />
                       
                       {/* Flowing Animated Dash Thread */}
-                      <line x1={srcPos.x} y1={srcPos.y} x2={tgtPos.x} y2={tgtPos.y} className="thread-pulse" />
+                      <line
+                        x1={srcPos.x}
+                        y1={srcPos.y}
+                        x2={tgtPos.x}
+                        y2={tgtPos.y}
+                        className="thread-pulse"
+                        style={{ strokeWidth: `${densityScale.strokeW * 1.3}px` }}
+                      />
 
                       {/* Traveling Luminous Photon Particle ONLY on actively traced path edges */}
                       {isPathActive && (
                         <circle
-                          r={0.85}
+                          r={densityScale.nodeR * 0.25}
                           fill="#00f0ff"
                           filter="url(#packet-glow)"
                           className="photon-particle"
@@ -609,14 +1048,21 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
                           <animateMotion
                             dur="1.8s"
                             repeatCount="indefinite"
-                            path={`M ${srcPos.x} ${srcPos.y} L ${tgtPos.x} ${tgtPos.y}`}
+                            path={`M ${fromPos.x} ${fromPos.y} L ${toPos.x} ${toPos.y}`}
                           />
                         </circle>
                       )}
 
-                      <text x={(srcPos.x + tgtPos.x) / 2} y={(srcPos.y + tgtPos.y) / 2 - 1} className="edge-label">
-                        {edge.label}
-                      </text>
+                      {displayedNodes.length <= 25 && (
+                        <text
+                          x={(srcPos.x + tgtPos.x) / 2}
+                          y={(srcPos.y + tgtPos.y) / 2 - 1}
+                          className="edge-label"
+                          style={{ fontSize: `${densityScale.fontSize * 0.7}px` }}
+                        >
+                          {edge.label}
+                        </text>
+                      )}
                     </g>
                   );
                 })}
@@ -642,7 +1088,7 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
                       {/* Active Status Radar Wave Halo */}
                       {isActive && (
                         <circle
-                          r={5}
+                          r={densityScale.activeR * 1.3}
                           fill="none"
                           stroke="#00f0ff"
                           className="active-radar-ring"
@@ -650,45 +1096,49 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
                       )}
 
                       {/* Main Node Circle */}
-                      <circle r={isActive ? 5.5 : 4} />
+                      <circle r={isActive ? densityScale.activeR : densityScale.nodeR} />
 
                       {/* Active Status Beacon Dot */}
                       {isActive && (
                         <circle
-                          cx={3.8}
-                          cy={-3.8}
-                          r={1.2}
+                          cx={densityScale.nodeR * 0.8}
+                          cy={-densityScale.nodeR * 0.8}
+                          r={densityScale.nodeR * 0.3}
                           fill="#00f0ff"
                           filter="url(#thread-glow)"
                           className="blink"
                         />
                       )}
 
+                      {/* Dynamic Scaled Node Name */}
                       <text
-                        y="9"
+                        y={densityScale.labelY}
                         className={`node-name ${isActive ? 'font-semibold' : ''}`}
-                        style={{ fill: isActive ? '#ffffff' : undefined }}
+                        style={{
+                          fill: isActive ? '#ffffff' : undefined,
+                          fontSize: `${densityScale.fontSize}px`
+                        }}
                       >
-                        {node.name}
+                        {formatNodeName(node, densityScale.maxChars)}
                       </text>
 
                       {/* Active Status Badge Pill vs Regular Type Label */}
                       {isActive ? (
-                        <g transform="translate(0, 13)">
+                        <g transform={`translate(0, ${densityScale.labelY + densityScale.fontSize * 1.6})`}>
                           <rect
-                            x="-8"
-                            y="-2"
-                            width="16"
-                            height="3.2"
-                            rx="1.6"
+                            x={-7 * densityScale.badgeScale}
+                            y={-1.8 * densityScale.badgeScale}
+                            width={14 * densityScale.badgeScale}
+                            height={3.2 * densityScale.badgeScale}
+                            rx={1.6 * densityScale.badgeScale}
                             fill="rgba(0, 240, 255, 0.22)"
                             stroke="rgba(0, 240, 255, 0.75)"
-                            strokeWidth="0.3"
+                            strokeWidth={0.25 * densityScale.badgeScale}
                           />
                           <text
-                            y="0.3"
+                            y={0.3 * densityScale.badgeScale}
                             fill="#00f0ff"
-                            fontSize="1.5"
+                            fontSize={1.3 * densityScale.badgeScale}
                             textAnchor="middle"
                             fontFamily="var(--font-mono)"
                             fontWeight="bold"
@@ -697,11 +1147,15 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
                             ● ACTIVE
                           </text>
                         </g>
-                      ) : (
-                        <text y="12.8" className="node-type">
-                          {node.type}
+                      ) : densityScale.showType ? (
+                        <text
+                          y={densityScale.labelY + densityScale.fontSize * 1.6}
+                          className="node-type"
+                          style={{ fontSize: `${densityScale.fontSize * 0.75}px` }}
+                        >
+                          {formatNodeSubLabel(node)}
                         </text>
-                      )}
+                      ) : null}
                     </g>
                   );
                 })}
@@ -710,37 +1164,42 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
               {/* Zoom Controls (Bottom Left) */}
               <div className="absolute bottom-3 left-3 flex gap-1.5 z-10">
                 <button
-                  onClick={() => setZoom((z) => Math.min(1.4, z + 0.1))}
-                  className="grid size-8 place-items-center rounded border border-signal/15 bg-panel/80 text-foreground hover:bg-signal/20 transition"
+                  onClick={handleZoomIn}
+                  className="grid size-8 place-items-center rounded border border-signal/20 bg-panel/85 text-foreground hover:bg-signal/20 transition shadow-lg backdrop-blur-md"
+                  title="Zoom in (or scroll wheel up)"
                   aria-label="Zoom in"
                 >
-                  <ZoomIn className="size-3.5 text-foreground" />
+                  <ZoomIn className="size-3.5 text-signal" />
                 </button>
                 <button
-                  onClick={() => setZoom((z) => Math.max(0.7, z - 0.1))}
-                  className="grid size-8 place-items-center rounded border border-signal/15 bg-panel/80 text-foreground hover:bg-signal/20 transition"
+                  onClick={handleZoomOut}
+                  className="grid size-8 place-items-center rounded border border-signal/20 bg-panel/85 text-foreground hover:bg-signal/20 transition shadow-lg backdrop-blur-md"
+                  title="Zoom out (or scroll wheel down)"
                   aria-label="Zoom out"
                 >
-                  <ZoomOut className="size-3.5 text-foreground" />
+                  <ZoomOut className="size-3.5 text-signal" />
                 </button>
                 <button
-                  onClick={() => setZoom(1)}
-                  className="grid size-8 place-items-center rounded border border-signal/15 bg-panel/80 text-foreground hover:bg-signal/20 transition"
-                  title="Reset Zoom"
+                  onClick={handleResetZoom}
+                  className="grid size-8 place-items-center rounded border border-signal/20 bg-panel/85 text-foreground hover:bg-signal/20 transition shadow-lg backdrop-blur-md"
+                  title="Reset zoom & center pan"
+                  aria-label="Reset zoom"
                 >
-                  <RotateCcw className="size-3.5 text-foreground" />
+                  <RotateCcw className="size-3.5 text-signal" />
                 </button>
               </div>
 
               {/* Zoom Indicator (Bottom Right) */}
-              <div className="absolute bottom-3 right-3 font-mono text-[10px] text-muted-foreground border border-signal/10 bg-panel/70 rounded px-2 py-1 z-10">
-                {Math.round(zoom * 100)}% · pan enabled
+              <div className="absolute bottom-3 right-3 font-mono text-[10px] text-muted-foreground border border-signal/15 bg-panel/80 rounded px-2.5 py-1 z-10 shadow-md backdrop-blur-md flex items-center gap-1.5">
+                <span className="text-signal font-semibold">{Math.round(zoom * 100)}%</span>
+                <span>·</span>
+                <span>drag to pan</span>
               </div>
 
               {/* Relationship Detected Alert Banner */}
               {analysisStep === 5 && (
                 <div className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-warn/30 bg-warn/10 px-4 py-2 text-[10px] font-mono tracking-wide text-warn z-10 animate-in fade-in zoom-in-95">
-                  POTENTIAL RELATIONSHIP DETECTED · {Math.max(1, allHiddenPath.length - 1)} HOPS · HUMAN VERIFICATION REQUIRED
+                  POTENTIAL RELATIONSHIP DETECTED · {Math.max(1, effectiveLeadPath.length - 1)} HOPS · HUMAN VERIFICATION REQUIRED
                 </div>
               )}
             </>
@@ -748,11 +1207,13 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
 
           {activeTab === 'RADIAL' && (
             <EgoCentricRadialGraph
-              centerEntityId={effectiveSelectedId}
+              centerEntityId={mainLeadEntityId}
               selectedEntityId={inspectingEntityId || effectiveSelectedId}
               onSelectEntity={handleEntitySelect}
               onSelectEdgeRecord={(recId) => setActiveModalRecordId(recId)}
-              zoom={zoom}
+              entityLimit={entityLimit}
+              leadPathNodeIds={effectiveLeadPath}
+              onNodesCountChange={setRadialNodesCount}
             />
           )}
 
@@ -792,7 +1253,7 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
             <div className="text-[10px] tracking-[0.22em] font-mono text-signal/70">
               ENTITY FOCUS
             </div>
-            <span className="text-[10px] font-mono text-muted-foreground">{selectedEntity?.id}</span>
+            <span className="text-[10px] font-mono text-muted-foreground">{selectedEntity ? formatNodeSubLabel(selectedEntity) : ''}</span>
           </div>
 
           <div className="flex items-center gap-3">
@@ -805,7 +1266,7 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
             </div>
             <div>
               <div className="font-display text-base font-semibold text-foreground">
-                {selectedEntity?.name}
+                {getEntityDisplayName(selectedEntity)}
               </div>
               <div className="text-[10px] font-mono text-muted-foreground">
                 {selectedEntity?.type} · {selectedEntity?.subtitle}
@@ -823,8 +1284,8 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
               <div className="text-[11px] mt-0.5 text-foreground">{selectedEntity?.cases ?? 0}</div>
             </div>
             <div>
-              <div className="font-mono text-[10px] text-muted-foreground">ENTITY ID</div>
-              <div className="text-[11px] mt-0.5 text-foreground">{selectedEntity?.id ?? '—'}</div>
+              <div className="font-mono text-[10px] text-muted-foreground">IDENTIFIER</div>
+              <div className="text-[11px] mt-0.5 text-foreground">{selectedEntity ? formatNodeSubLabel(selectedEntity) : '—'}</div>
             </div>
             <div>
               <div className="font-mono text-[10px] text-muted-foreground">STATUS</div>
@@ -870,13 +1331,13 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
             <div className="font-display text-base font-semibold text-foreground">
               {leadRel ? (
                 <span>
-                  {leadRel.sourceNodeName} <span className="text-warn">↔</span> {leadRel.targetNodeName}
+                  {getEntityDisplayName(leadRel.sourceNodeName || leadRel.sourceId)} <span className="text-warn">↔</span> {getEntityDisplayName(leadRel.targetNodeName || leadRel.targetId)}
                 </span>
               ) : (
                 <span>
-                  {allNodes.find((n) => n.id === effectiveLeadPath[0])?.name || allNodes[0]?.name || 'Primary Subject'}{' '}
+                  {getEntityDisplayName(allNodes.find((n) => n.id === effectiveLeadPath[0]) || effectiveLeadPath[0] || allNodes[0] || 'Primary Subject')}{' '}
                   <span className="text-warn">↔</span>{' '}
-                  {allNodes.find((n) => n.id === effectiveLeadPath[effectiveLeadPath.length - 1])?.name || allNodes[1]?.name || 'Target Subject'}
+                  {getEntityDisplayName(allNodes.find((n) => n.id === effectiveLeadPath[effectiveLeadPath.length - 1]) || effectiveLeadPath[effectiveLeadPath.length - 1] || allNodes[1] || 'Target Subject')}
                 </span>
               )}
             </div>
@@ -934,7 +1395,7 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
                     key={`${nodeId}-${idx}`}
                     className="text-signal font-semibold"
                   >
-                    {allNodes.find((t) => t.id === nodeId)?.name ?? nodeId}
+                    {getEntityDisplayName(allNodes.find((t) => t.id === nodeId) || nodeId)}
                     {idx < effectiveLeadPath.length - 1 ? ' →' : ''}
                   </span>
                 ))}
@@ -993,7 +1454,7 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
         />
       </section>
 
-      {/* Structured Inquiry Command Bar with Quick Suggestion Chips */}
+      {/* Structured Inquiry Command Bar with Data-Driven Suggestion Chips */}
       <section className="col-span-12 glass rounded-xl px-4 py-3 flex flex-col gap-2.5 border-signal/20">
         <div className="flex items-center gap-3">
           <Command className="size-4 text-signal shrink-0" />
@@ -1003,15 +1464,17 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
             onKeyDown={(e) => {
               if (e.key === 'Enter' && commandInput.trim()) {
                 const matched = allNodes.find((n) =>
-                  n.name.toLowerCase().includes(commandInput.toLowerCase())
+                  n.name.toLowerCase().includes(commandInput.toLowerCase()) ||
+                  n.id.toLowerCase() === commandInput.toLowerCase()
                 );
                 if (matched) {
-                  setSelectedId(matched.id);
+                  handleEntitySelect(matched.id);
+                  runAnalysis();
                 }
               }
             }}
             className="flex-1 bg-transparent text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none border-0"
-            placeholder="Ask the investigation system… (e.g. Show connections for Rahul Sharma, or click a quick suggestion)"
+            placeholder="Ask the investigation system… (e.g. Trace Garima ↔ Shailesh, find vehicle nexus, or click a suggestion below)"
           />
           <span className="hidden md:block text-[10px] font-mono text-muted-foreground px-2 py-1 rounded border border-signal/15">
             STRUCTURED INQUIRY
@@ -1020,10 +1483,12 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
             onClick={() => {
               if (commandInput.trim()) {
                 const matched = allNodes.find((n) =>
-                  n.name.toLowerCase().includes(commandInput.toLowerCase())
+                  n.name.toLowerCase().includes(commandInput.toLowerCase()) ||
+                  n.id.toLowerCase() === commandInput.toLowerCase()
                 );
                 if (matched) {
-                  setSelectedId(matched.id);
+                  handleEntitySelect(matched.id);
+                  runAnalysis();
                 }
               }
             }}
@@ -1033,39 +1498,36 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
           </button>
         </div>
 
-        {/* Quick Suggestion Chips */}
+        {/* Quick Suggestion Chips (Dynamically Generated From Live Data) */}
         <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-border/50 text-[10px] font-mono">
           <span className="text-muted-foreground">SUGGESTED QUERIES:</span>
-          <button
-            onClick={() => {
-              setCommandInput('Trace Rahul ↔ Amit 4-hop lead');
-              runAnalysis();
-              setSelectedId('P-014');
-            }}
-            className="px-2 py-0.5 rounded bg-signal/10 border border-signal/25 text-signal hover:bg-signal/20 transition"
-          >
-            ✦ Trace Rahul ↔ Amit 4-hop lead
-          </button>
-          <button
-            onClick={() => {
-              setCommandInput('Filter to Vehicle V co-location');
-              setActiveRelationCategories(['VEHICLE', 'LOCATION']);
-              setSelectedId('V-009');
-            }}
-            className="px-2 py-0.5 rounded bg-safe/10 border border-safe/25 text-safe hover:bg-safe/20 transition"
-          >
-            ✦ Vehicle V Co-location
-          </button>
-          <button
-            onClick={() => {
-              setCommandInput('Show Financial Wires to Organization N');
-              setActiveRelationCategories(['FINANCIAL', 'ORGANIZATION']);
-              setSelectedId('BA-11');
-            }}
-            className="px-2 py-0.5 rounded bg-azure/10 border border-azure/25 text-azure hover:bg-azure/20 transition"
-          >
-            ✦ Account A Wire Transfers
-          </button>
+          {dataDrivenSuggestions.map((sug, idx) => {
+            const toneColors = {
+              signal: 'bg-signal/10 border-signal/25 text-signal hover:bg-signal/20',
+              safe: 'bg-safe/10 border-safe/25 text-safe hover:bg-safe/20',
+              azure: 'bg-azure/10 border-azure/25 text-azure hover:bg-azure/20',
+              warn: 'bg-warn/10 border-warn/25 text-warn hover:bg-warn/20',
+            }[sug.tone] || 'bg-signal/10 border-signal/25 text-signal hover:bg-signal/20';
+
+            return (
+              <button
+                key={idx}
+                onClick={() => {
+                  setCommandInput(sug.query);
+                  handleEntitySelect(sug.targetId);
+                  if (sug.categories) {
+                    setActiveRelationCategories(sug.categories);
+                  }
+                  runAnalysis();
+                  setActiveTab('CANVAS');
+                }}
+                className={`px-2 py-0.5 rounded border transition ${toneColors}`}
+                title={`Run inquiry: ${sug.query}`}
+              >
+                ✦ {sug.label}
+              </button>
+            );
+          })}
           <button
             onClick={resetAllFilters}
             className="px-2 py-0.5 rounded bg-panel border border-signal/15 text-muted-foreground hover:text-foreground transition ml-auto flex items-center gap-1"
@@ -1119,7 +1581,7 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
               filteredNodes.slice(0, 5).map((node) => (
                 <button
                   key={node.id}
-                  onClick={() => setSelectedId(node.id)}
+                  onClick={() => handleEntitySelect(node.id)}
                   className={`w-full text-left flex items-center justify-between rounded-md px-2.5 py-2 border transition ${
                     effectiveSelectedId === node.id
                       ? 'border-signal/40 bg-signal/5'
@@ -1135,9 +1597,9 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
                       {NEXUS_ENTITY_ICONS[node.type]}
                     </span>
                     <span>
-                      <span className="block text-[11px] text-foreground font-medium">{node.name}</span>
+                      <span className="block text-[11px] text-foreground font-medium">{getEntityDisplayName(node)}</span>
                       <span className="block text-[9px] font-mono text-muted-foreground">
-                        {node.type} · {node.id}
+                        {node.type} · {formatNodeSubLabel(node)}
                       </span>
                     </span>
                   </span>

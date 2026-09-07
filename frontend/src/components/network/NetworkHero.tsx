@@ -43,6 +43,8 @@ import {
   NexusSuggestion
 } from '../../services/nexusData';
 import { useIntelData } from '../../context/IntelDataContext';
+import { formatNodeName, formatNodeSubLabel } from '../command-center/CommandCenter';
+import { getCanonicalEntity, getEntityDisplayName } from '../../services/canonicalEntities';
 import { NavSection } from '../layout/SidebarNav';
 import { EvidenceModal } from '../evidence/EvidenceModal';
 import { NetworkAnalyticsPanel } from './NetworkAnalyticsPanel';
@@ -90,6 +92,7 @@ export const NetworkHero: React.FC<NetworkHeroProps> = ({
     activeHiddenRelationshipId,
     activeHiddenRelationship,
     setActiveHiddenRelationshipId,
+    trackEntityHiddenRelationship,
     activeDatasetName,
     isCustomDataset,
   } = useIntelData();
@@ -110,49 +113,271 @@ export const NetworkHero: React.FC<NetworkHeroProps> = ({
   const [isRevealingPath, setIsRevealingPath] = useState<boolean>(false);
   const [revealStep, setRevealStep] = useState<number>(0);
 
-  // Dynamic active hidden path (prioritizes active selected lead, then active traced relationship)
+  // Selected Node State
+  const [selectedNodeId, setSelectedNodeId] = useState<string>(initialSelectedEntityId || allNodes[0]?.id || 'P003');
+
+  // Dynamic active hidden path (prioritizes active selected lead, then relationship matching selected node, then active traced relationship)
   const effectiveHiddenPath = useMemo(() => {
     if (selectedLead && selectedLead.path && selectedLead.path.length > 0) {
-      return selectedLead.path.map((p: any) => p.entityId);
+      return selectedLead.path.map((p: any) => (typeof p === 'string' ? p : p.entityId || String(p)));
+    }
+    // If activeHiddenRelationship contains selectedNodeId, use it directly
+    if (activeHiddenRelationship && activeHiddenRelationship.pathNodeIds.length > 0) {
+      if (
+        !selectedNodeId ||
+        activeHiddenRelationship.sourceNodeId === selectedNodeId ||
+        activeHiddenRelationship.targetNodeId === selectedNodeId ||
+        activeHiddenRelationship.sourceId === selectedNodeId ||
+        activeHiddenRelationship.targetId === selectedNodeId ||
+        activeHiddenRelationship.pathNodeIds.includes(selectedNodeId)
+      ) {
+        return activeHiddenRelationship.pathNodeIds;
+      }
+    }
+    // Check if any hiddenRelationship contains selectedNodeId
+    if (selectedNodeId) {
+      const match = hiddenRelationships.find(
+        (r) =>
+          r.sourceNodeId === selectedNodeId ||
+          r.targetNodeId === selectedNodeId ||
+          r.sourceId === selectedNodeId ||
+          r.targetId === selectedNodeId ||
+          (r.pathNodeIds && r.pathNodeIds.includes(selectedNodeId))
+      );
+      if (match && match.pathNodeIds.length > 0) {
+        return match.pathNodeIds;
+      }
     }
     if (activeHiddenRelationship && activeHiddenRelationship.pathNodeIds.length > 0) {
       return activeHiddenRelationship.pathNodeIds;
     }
+    if (hiddenRelationships.length > 0 && hiddenRelationships[0].pathNodeIds.length > 0) {
+      return hiddenRelationships[0].pathNodeIds;
+    }
     return allHiddenPath;
-  }, [selectedLead, activeHiddenRelationship, allHiddenPath]);
+  }, [selectedLead, activeHiddenRelationship, selectedNodeId, hiddenRelationships, allHiddenPath]);
+
+  // Dynamic investigation query suggestions derived from active dataset
+  const dataDrivenSuggestions = useMemo(() => {
+    if (suggestions && suggestions.length > 0) {
+      return suggestions.slice(0, 4);
+    }
+    const list: NexusSuggestion[] = [];
+
+    // 1. POI multi-hop bridge
+    const p3 = allNodes.find((n) => n.id === 'P003' || n.name.toLowerCase().includes('garima'));
+    const p20 = allNodes.find((n) => n.id === 'P020' || n.name.toLowerCase().includes('shailesh'));
+    if (p3) {
+      list.push({
+        id: 'sug-garima-shailesh',
+        title: p20 ? `Trace ${p3.name.split(' ')[0]} ↔ ${p20.name.split(' ')[0]}` : `Trace ${p3.name}`,
+        category: 'LEAD',
+        description: `Discovered 5-hop indirect connection connecting ${p3.name} (${p3.id}) with ${p20 ? p20.name : 'syndicate'}.`,
+        confidence: 0.94,
+        actionLabel: p20 ? `Trace ${p3.name.split(' ')[0]} ↔ ${p20.name.split(' ')[0]}` : `Trace ${p3.name}`,
+        targetNodeId: p3.id,
+        activeCategories: ['COMMUNICATION', 'VEHICLE'],
+        stepAnimation: true,
+      });
+    }
+
+    // 2. Vehicle nexus to Case
+    const vh = allNodes.find((n) => n.id === 'VH02' || n.name.includes('UP16') || n.type === 'VEHICLE');
+    if (vh) {
+      list.push({
+        id: 'sug-vehicle-nexus',
+        title: `Isolate ${vh.name.split(' ')[0]} Nexus`,
+        category: 'ANOMALY',
+        description: `Vehicle ${vh.name} (${vh.id}) bridges multi-subject movements across Case records.`,
+        confidence: 0.89,
+        actionLabel: `Focus Vehicle ${vh.name.split(' ')[0]}`,
+        targetNodeId: vh.id,
+        activeCategories: ['VEHICLE', 'CASE'],
+        searchFilter: vh.name.split(' ')[0],
+      });
+    }
+
+    // 3. Banking wire bridge
+    const acc = allNodes.find((n) => n.id === 'ACC05' || n.type === 'BANK ACCOUNT');
+    if (acc) {
+      list.push({
+        id: 'sug-wire-transfer',
+        title: `Wire Flow: ${acc.name.split('(')[0].trim()}`,
+        category: 'LEAD',
+        description: `Financial transfers via account ${acc.name} (${acc.id}).`,
+        confidence: 0.88,
+        actionLabel: 'Filter Fund Flows',
+        targetNodeId: acc.id,
+        activeCategories: ['FINANCIAL'],
+        searchFilter: acc.id,
+      });
+    }
+
+    // 4. Location rendezvous
+    const loc = allNodes.find((n) => n.id === 'LOC09' || n.type === 'LOCATION');
+    if (loc) {
+      list.push({
+        id: 'sug-location-rendezvous',
+        title: `Rendezvous at ${loc.name.length > 18 ? loc.name.slice(0, 16) + '…' : loc.name}`,
+        category: 'VERIFY',
+        description: `Physical rendezvous logs at ${loc.name} (${loc.id}).`,
+        confidence: 0.91,
+        actionLabel: 'Filter Location',
+        targetNodeId: loc.id,
+        activeCategories: ['LOCATION'],
+        searchFilter: loc.name.split(' ')[0],
+      });
+    }
+
+    if (list.length === 0) {
+      return allSuggestions.slice(0, 4);
+    }
+    return list;
+  }, [allNodes, suggestions, allSuggestions]);
 
   // Navigation & Sub-view State
   const [activeTab, setActiveTab] = useState<GraphViewTab>('CANVAS');
-  const [selectedNodeId, setSelectedNodeId] = useState<string>(initialSelectedEntityId || allNodes[0]?.id || 'P-014');
   const [zoom, setZoom] = useState<number>(1);
+  const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState<boolean>(false);
+  const [dragStart, setDragStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  // Mouse Wheel Zoom Handler (0.4x to 3.0x)
+  const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.12 : 0.88;
+    setZoom((z) => Math.min(3.0, Math.max(0.4, Math.round(z * factor * 100) / 100)));
+  };
+
+  // Mouse Drag Pan Handlers
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    const target = e.target as HTMLElement | SVGElement;
+    if (target.closest('.graph-node') || target.closest('button')) return;
+    setIsPanning(true);
+    setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isPanning) return;
+    setPan({
+      x: e.clientX - dragStart.x,
+      y: e.clientY - dragStart.y,
+    });
+  };
+
+  const handleMouseUp = () => setIsPanning(false);
+
+  // Zoom Button Handlers
+  const handleZoomIn = () => setZoom((z) => Math.min(3.0, Math.round((z + 0.15) * 100) / 100));
+  const handleZoomOut = () => setZoom((z) => Math.max(0.4, Math.round((z - 0.15) * 100) / 100));
+  const handleResetZoom = () => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  };
+
   const [showPath, setShowPath] = useState<boolean>(true);
   const [activeEvidenceId, setActiveEvidenceId] = useState<string | null>(null);
   const [inspectingEntityId, setInspectingEntityId] = useState<string | null>(null);
 
-  // When an active hidden relationship is set, focus on its source and reveal the full path
+  // When an active hidden relationship is set, reveal the full path and ensure focus
   useEffect(() => {
     if (activeHiddenRelationship) {
       setShowPath(true);
       setPathProgress(activeHiddenRelationship.pathNodeIds.length);
-      setSelectedNodeId(activeHiddenRelationship.sourceNodeId);
-      setInspectingEntityId(activeHiddenRelationship.sourceNodeId);
+      if (!selectedNodeId || !activeHiddenRelationship.pathNodeIds.includes(selectedNodeId)) {
+        setSelectedNodeId(activeHiddenRelationship.sourceNodeId);
+        setInspectingEntityId(activeHiddenRelationship.sourceNodeId);
+      }
       setActiveTab('CANVAS');
     }
   }, [activeHiddenRelationship]);
 
+  const [radialNodesCount, setRadialNodesCount] = useState<number>(15);
+
   // Ensure effective selected node
   const effectiveSelectedNodeId = useMemo(() => {
     if (selectedNodeId && allNodes.some((n) => n.id === selectedNodeId)) return selectedNodeId;
-    return allNodes[0]?.id || 'P-014';
+    return allNodes[0]?.id || 'P003';
   }, [allNodes, selectedNodeId]);
+
+  // Main Lead root entity for radial orbit anchoring
+  const mainLeadEntityId = useMemo(() => {
+    if (activeHiddenRelationship) {
+      return (
+        activeHiddenRelationship.sourceNodeId ||
+        activeHiddenRelationship.sourceId ||
+        activeHiddenRelationship.pathNodeIds?.[0] ||
+        effectiveSelectedNodeId
+      );
+    }
+    if (selectedLead) {
+      return (
+        selectedLead.sourceEntityId ||
+        selectedLead.sourceId ||
+        selectedLead.path?.[0]?.entityId ||
+        effectiveSelectedNodeId
+      );
+    }
+    if (effectiveHiddenPath && effectiveHiddenPath.length > 0) {
+      return effectiveHiddenPath[0];
+    }
+    return effectiveSelectedNodeId;
+  }, [activeHiddenRelationship, selectedLead, effectiveHiddenPath, effectiveSelectedNodeId]);
 
   const selectedNode = useMemo(() => {
     return allNodes.find((n) => n.id === effectiveSelectedNodeId) || allNodes[0];
   }, [allNodes, effectiveSelectedNodeId]);
 
-  const handleEntitySelect = (nodeId: string) => {
+  const handleEntitySelect = async (nodeId: string) => {
     setSelectedNodeId(nodeId);
     setInspectingEntityId(nodeId);
+
+    // 1. Dynamic correlation via trackEntityHiddenRelationship
+    if (trackEntityHiddenRelationship) {
+      try {
+        const activeRel = await trackEntityHiddenRelationship(nodeId);
+        if (activeRel) {
+          setSelectedLead(null);
+          setShowPath(true);
+          setPathProgress(activeRel.pathNodeIds.length);
+          setAnalysisStep(activeRel.pathNodeIds.length);
+          return;
+        }
+      } catch (err) {
+        console.warn('Error tracking entity hidden relationship in NetworkHero:', err);
+      }
+    }
+
+    // 2. Correlate with known hidden relationships (source, target, or path intermediary)
+    const matchingRel = hiddenRelationships.find((r) =>
+      r.sourceNodeId === nodeId ||
+      r.targetNodeId === nodeId ||
+      r.sourceId === nodeId ||
+      r.targetId === nodeId ||
+      (r.pathNodeIds && r.pathNodeIds.includes(nodeId))
+    );
+
+    if (matchingRel) {
+      setActiveHiddenRelationshipId(matchingRel.id);
+      setSelectedLead(null);
+      setShowPath(true);
+      setPathProgress(matchingRel.pathNodeIds.length);
+      setAnalysisStep(matchingRel.pathNodeIds.length);
+    } else {
+      // 3. Check discovered leads
+      const matchingLead = discoveredLeads.find((l) =>
+        l.sourceEntityId === nodeId ||
+        l.targetEntityId === nodeId ||
+        (Array.isArray(l.path) && l.path.some((p: any) => (typeof p === 'string' ? p : p.entityId) === nodeId))
+      );
+      if (matchingLead) {
+        handleSelectLead(matchingLead);
+      } else {
+        setActiveHiddenRelationshipId(null);
+        setSelectedLead(null);
+      }
+    }
   };
 
   const handleSelectLead = (lead: any) => {
@@ -304,7 +529,7 @@ export const NetworkHero: React.FC<NetworkHeroProps> = ({
     return neighbors;
   }, [allEdges, selectedNodeId, effectiveSelectedNodeId]);
 
-  // Rank nodes by importance: Selected > 1-Hop Neighbors > Search Match > Active Path > Connections > Risk
+  // Rank nodes by importance: Selected > In Active Hidden Path > 1-Hop Neighbors > Search Match > Connections > Risk
   const rankedNodes = useMemo(() => {
     const focusId = selectedNodeId || effectiveSelectedNodeId;
     const q = searchQuery.trim().toLowerCase();
@@ -315,22 +540,22 @@ export const NetworkHero: React.FC<NetworkHeroProps> = ({
       const bFocus = (b.id === focusId) ? 1 : 0;
       if (aFocus !== bFocus) return bFocus - aFocus;
 
-      // 2. Secondary: 1-hop neighbor of focused node
+      // 2. Secondary: In active hidden path / lead (CRUCIAL: ensures all entities in the tracked hidden link are prioritized!)
+      const aPath = pathSet.has(a.id) ? 1 : 0;
+      const bPath = pathSet.has(b.id) ? 1 : 0;
+      if (aPath !== bPath) return bPath - aPath;
+
+      // 3. Tertiary: 1-hop neighbor of focused node
       const aNbr = selectedNeighborIds.has(a.id) ? 1 : 0;
       const bNbr = selectedNeighborIds.has(b.id) ? 1 : 0;
       if (aNbr !== bNbr) return bNbr - aNbr;
 
-      // 3. Tertiary: Search query match
+      // 4. Quaternary: Search query match
       if (q) {
         const aMatch = (a.name.toLowerCase().includes(q) || a.id.toLowerCase().includes(q) || a.type.toLowerCase().includes(q)) ? 1 : 0;
         const bMatch = (b.name.toLowerCase().includes(q) || b.id.toLowerCase().includes(q) || b.type.toLowerCase().includes(q)) ? 1 : 0;
         if (aMatch !== bMatch) return bMatch - aMatch;
       }
-
-      // 4. Quaternary: In active hidden path / lead
-      const aPath = pathSet.has(a.id) ? 1 : 0;
-      const bPath = pathSet.has(b.id) ? 1 : 0;
-      if (aPath !== bPath) return bPath - aPath;
 
       // 5. Quinary: Connection count / Degree centrality
       const connDiff = (b.connections || 0) - (a.connections || 0);
@@ -341,7 +566,7 @@ export const NetworkHero: React.FC<NetworkHeroProps> = ({
     });
   }, [allNodes, selectedNodeId, effectiveSelectedNodeId, selectedNeighborIds, searchQuery, pathSet]);
 
-  // Slice to active entity limit (default 15), but always guarantee that active path nodes are displayed
+  // Slice to active entity limit (default 15), but ALWAYS guarantee that all active path nodes are displayed
   const displayedNodes = useMemo(() => {
     const base = entityLimit === 'ALL' ? [...rankedNodes] : rankedNodes.slice(0, entityLimit);
     const existingIds = new Set(base.map((n) => n.id));
@@ -362,8 +587,8 @@ export const NetworkHero: React.FC<NetworkHeroProps> = ({
               type: step.entityType,
               riskScore: 70,
               subtitle: step.entityType,
-              x: 50 + (existingIds.size * 11) % 35,
-              y: 50 + (existingIds.size * 13) % 35
+              x: 50,
+              y: 50
             } as any);
             existingIds.add(id);
           }
@@ -377,7 +602,7 @@ export const NetworkHero: React.FC<NetworkHeroProps> = ({
     return new Set(displayedNodes.map((n) => n.id));
   }, [displayedNodes]);
 
-  // Canvas Edges: Interconnect nodes that are both currently displayed, including discovered lead path edges
+  // Canvas Edges: Interconnect nodes that are both currently displayed, including all path edges of the active hidden relationship
   const canvasEdges = useMemo(() => {
     const existingPairs = new Set<string>();
     const edges = visibleEdges.filter((edge) => {
@@ -386,108 +611,162 @@ export const NetworkHero: React.FC<NetworkHeroProps> = ({
       return displayedNodeIds.has(edge.source) && displayedNodeIds.has(edge.target);
     });
 
-    if (selectedLead && selectedLead.path) {
-      for (let i = 0; i < selectedLead.path.length - 1; i++) {
-        const u = selectedLead.path[i].entityId;
-        const v = selectedLead.path[i + 1].entityId;
-        const pair = `${u}__${v}`;
-        if (!existingPairs.has(pair)) {
-          existingPairs.add(pair);
-          existingPairs.add(`${v}__${u}`);
-          const stepEdge = selectedLead.path[i].stepEdge || {};
+    // Ensure all consecutive hops along the tracked hidden path are explicitly present in canvasEdges
+    const activePath = effectiveHiddenPath || [];
+    for (let i = 0; i < activePath.length - 1; i++) {
+      const u = activePath[i];
+      const v = activePath[i + 1];
+      const pair = `${u}__${v}`;
+      if (!existingPairs.has(pair)) {
+        existingPairs.add(pair);
+        existingPairs.add(`${v}__${u}`);
+        const realEdge = allEdges.find(
+          (e) => (e.source === u && e.target === v) || (e.source === v && e.target === u)
+        );
+        if (realEdge) {
+          edges.push({
+            ...realEdge,
+            active: true
+          });
+        } else {
           edges.push({
             id: `edge-path-${u}-${v}`,
             source: u,
             target: v,
             category: 'COMMUNICATION',
-            label: stepEdge.relationshipType || 'INDIRECT_LINK',
-            confidence: stepEdge.confidence || 0.90,
-            recordId: stepEdge.evidenceId || 'EVID-PATH',
-            caseId: stepEdge.caseId || 'CASE-0142',
-            sourceType: stepEdge.sourceTable || 'investigation_records'
+            label: 'TRACKED_PATH_LINK',
+            confidence: 0.95,
+            recordId: `REC-${u}-${v}`,
+            caseId: activeHiddenRelationship?.caseDocket || 'CASE01',
+            sourceType: 'intelligence_provenance',
+            date: '2026-02-15',
+            active: true
           } as any);
         }
       }
     }
 
     return edges;
-  }, [visibleEdges, displayedNodeIds, selectedLead]);
+  }, [visibleEdges, displayedNodeIds, effectiveHiddenPath, allEdges, activeHiddenRelationship]);
 
-  // Clean, non-overlapping concentric layout for displayed nodes
-  const nodeLayout = useMemo(() => {
-    const coords = new Map<string, { x: number; y: number }>();
-    if (displayedNodes.length === 0) return coords;
-
-    // For default 9 nodes with no custom dataset, keep handcrafted positions
-    if (nodes.length === 0 && allNodes.length <= 9) {
-      displayedNodes.forEach((n) => coords.set(n.id, { x: n.x, y: n.y }));
-      return coords;
+  // Set of consecutive path edge pairs for strict single-threaded progression
+  const consecutivePathEdges = useMemo(() => {
+    const set = new Set<string>();
+    const activePath = showPath ? effectiveHiddenPath.slice(0, pathProgress) : [];
+    for (let i = 0; i < activePath.length - 1; i++) {
+      set.add(`${activePath[i]}__${activePath[i + 1]}`);
+      set.add(`${activePath[i + 1]}__${activePath[i]}`);
     }
+    return set;
+  }, [showPath, effectiveHiddenPath, pathProgress]);
 
-    // Central focus node: effectiveSelectedNodeId if present in displayedNodes, otherwise #1 ranked node
+  // Dynamic density scale for node radius, label font-size, and stroke widths in NetworkHero
+  const densityScale = useMemo(() => {
+    const count = displayedNodes.length;
+    if (count > 50) {
+      return { nodeR: 2.2, activeR: 3.2, fontSize: 2.2, strokeW: 0.35, labelY: 3.8, maxChars: 7 };
+    }
+    if (count > 25) {
+      return { nodeR: 2.8, activeR: 3.8, fontSize: 2.7, strokeW: 0.5, labelY: 4.6, maxChars: 9 };
+    }
+    if (count > 12) {
+      return { nodeR: 3.4, activeR: 4.6, fontSize: 3.2, strokeW: 0.65, labelY: 5.5, maxChars: 11 };
+    }
+    return { nodeR: 4.2, activeR: 5.8, fontSize: 3.8, strokeW: 0.85, labelY: 6.8, maxChars: 14 };
+  }, [displayedNodes.length]);
+
+  // Clean, non-overlapping concentric layout for displayed nodes with dynamic coordinate space
+  const { nodeLayout, canvasDimension } = useMemo(() => {
+    const count = displayedNodes.length;
+    let dim = 100;
+    if (count > 50) dim = 300;
+    else if (count > 25) dim = 220;
+    else if (count > 12) dim = 160;
+
+    const coords = new Map<string, { x: number; y: number }>();
+    if (count === 0) return { nodeLayout: coords, canvasDimension: dim };
+
+    const cx = dim / 2;
+    const cy = dim * 0.48;
+
+    // Central focus node: effectiveSelectedNodeId if present, else #1
     const center = displayedNodes.find((n) => n.id === effectiveSelectedNodeId) || displayedNodes[0];
-    coords.set(center.id, { x: 50, y: 48 });
+    coords.set(center.id, { x: cx, y: cy });
 
     const others = displayedNodes.filter((n) => n.id !== center.id);
-    const count = others.length;
 
-    if (count <= 8) {
-      // Single ring (Radius 27)
-      others.forEach((n, i) => {
-        const angle = (2 * Math.PI * i) / (count || 1) - Math.PI / 2;
+    // Separate into path nodes and non-path nodes so path nodes form an organized arc
+    // CRUCIAL: Sort path nodes in others strictly by their index in effectiveHiddenPath!
+    const pathNodesInOthers = others
+      .filter((n) => pathSet.has(n.id))
+      .sort((a, b) => effectiveHiddenPath.indexOf(a.id) - effectiveHiddenPath.indexOf(b.id));
+
+    const nonPathNodes = others.filter((n) => !pathSet.has(n.id));
+
+    // Place path nodes in sequence along the upper arc so the hidden connection is immediately clear
+    if (pathNodesInOthers.length > 0) {
+      const pathRadius = dim * 0.32;
+      const arcStart = -Math.PI * 0.85;
+      const arcEnd = -Math.PI * 0.15;
+      pathNodesInOthers.forEach((n, idx) => {
+        const t = pathNodesInOthers.length === 1 ? 0.5 : idx / (pathNodesInOthers.length - 1);
+        const angle = arcStart + t * (arcEnd - arcStart);
         coords.set(n.id, {
-          x: Math.round(50 + 27 * Math.cos(angle)),
-          y: Math.round(48 + 27 * Math.sin(angle)),
-        });
-      });
-    } else if (count <= 18) {
-      // 2 concentric rings: Ring 1 (6 nodes, r=22), Ring 2 (rest, r=37)
-      const r1 = Math.min(6, Math.ceil(count * 0.4));
-      const r2 = count - r1;
-      others.slice(0, r1).forEach((n, i) => {
-        const angle = (2 * Math.PI * i) / (r1 || 1) - Math.PI / 2;
-        coords.set(n.id, {
-          x: Math.round(50 + 22 * Math.cos(angle)),
-          y: Math.round(48 + 22 * Math.sin(angle)),
-        });
-      });
-      others.slice(r1).forEach((n, i) => {
-        const angle = (2 * Math.PI * i) / (r2 || 1) - Math.PI / 4;
-        coords.set(n.id, {
-          x: Math.round(50 + 37 * Math.cos(angle)),
-          y: Math.round(48 + 37 * Math.sin(angle)),
-        });
-      });
-    } else {
-      // 3 concentric rings: Ring 1 (6, r=19), Ring 2 (12, r=31), Ring 3 (rest, r=42)
-      const r1 = 6;
-      const r2 = Math.min(12, count - r1);
-      const r3 = Math.max(1, count - r1 - r2);
-      others.slice(0, r1).forEach((n, i) => {
-        const angle = (2 * Math.PI * i) / (r1 || 1) - Math.PI / 2;
-        coords.set(n.id, {
-          x: Math.round(50 + 19 * Math.cos(angle)),
-          y: Math.round(48 + 19 * Math.sin(angle)),
-        });
-      });
-      others.slice(r1, r1 + r2).forEach((n, i) => {
-        const angle = (2 * Math.PI * i) / (r2 || 1) - Math.PI / 4;
-        coords.set(n.id, {
-          x: Math.round(50 + 31 * Math.cos(angle)),
-          y: Math.round(48 + 31 * Math.sin(angle)),
-        });
-      });
-      others.slice(r1 + r2).forEach((n, i) => {
-        const angle = (2 * Math.PI * i) / (r3 || 1) - Math.PI / 6;
-        coords.set(n.id, {
-          x: Math.round(50 + 42 * Math.cos(angle)),
-          y: Math.round(48 + 42 * Math.sin(angle)),
+          x: Math.round((cx + pathRadius * Math.cos(angle)) * 10) / 10,
+          y: Math.round((cy + pathRadius * Math.sin(angle)) * 10) / 10,
         });
       });
     }
 
-    return coords;
-  }, [displayedNodes, nodes.length, allNodes.length, effectiveSelectedNodeId]);
+    // Distribute remaining non-path neighbors across lower and outer rings
+    const remCount = nonPathNodes.length;
+    if (remCount > 0) {
+      const hasPathArc = pathNodesInOthers.length > 0;
+      const rings = remCount > 30 ? 3 : remCount > 12 ? 2 : 1;
+      const ringRadii = rings === 1
+        ? [dim * 0.38]
+        : rings === 2
+        ? [dim * 0.30, dim * 0.44]
+        : [dim * 0.24, dim * 0.35, dim * 0.46];
+
+      const ringCapacities = rings === 1
+        ? [remCount]
+        : rings === 2
+        ? [Math.min(8, Math.ceil(remCount * 0.4)), remCount]
+        : [6, 12, remCount];
+
+      let allocated = 0;
+      for (let r = 0; r < rings; r++) {
+        const radius = ringRadii[r];
+        const maxInRing = ringCapacities[r];
+        const currentRingNodes = nonPathNodes.slice(allocated, allocated + maxInRing);
+        allocated += currentRingNodes.length;
+        const ringLen = currentRingNodes.length;
+
+        // If path nodes exist on upper arc, place non-path nodes along lower & lateral arc (0.05*PI to 0.95*PI)
+        const lowerStart = 0.05 * Math.PI;
+        const lowerEnd = 0.95 * Math.PI;
+
+        currentRingNodes.forEach((n, i) => {
+          let angle: number;
+          if (hasPathArc) {
+            const t = ringLen === 1 ? 0.5 : i / (ringLen - 1);
+            angle = lowerStart + t * (lowerEnd - lowerStart);
+          } else {
+            const startAngle = (r * Math.PI) / 6;
+            angle = startAngle + (2 * Math.PI * i) / (ringLen || 1);
+          }
+          coords.set(n.id, {
+            x: Math.round((cx + radius * Math.cos(angle)) * 10) / 10,
+            y: Math.round((cy + radius * Math.sin(angle)) * 10) / 10,
+          });
+        });
+        if (allocated >= remCount) break;
+      }
+    }
+
+    return { nodeLayout: coords, canvasDimension: dim };
+  }, [displayedNodes, effectiveSelectedNodeId, pathSet, effectiveHiddenPath]);
 
   const activeEvidence = useMemo(() => {
     return allEvidence.find((e) => e.id === activeEvidenceId) || null;
@@ -714,11 +993,11 @@ export const NetworkHero: React.FC<NetworkHeroProps> = ({
                   {canvasEdges.length} active edges
                 </span>
                 <span className="text-muted-foreground text-[11px] font-mono">
-                  · Showing <span className="text-signal font-semibold">{displayedNodes.length}</span> of {allNodes.length} entities
+                  · Showing <span className="text-signal font-semibold">{activeTab === 'RADIAL' ? radialNodesCount : displayedNodes.length}</span> of {allNodes.length} entities
                 </span>
-                {displayedNodes.length < allNodes.length && (
+                {(activeTab === 'RADIAL' ? radialNodesCount : displayedNodes.length) < allNodes.length && (
                   <span className="text-[9px] font-mono text-safe bg-safe/10 border border-safe/25 px-1.5 py-0.5 rounded">
-                    KEY HUBS ONLY
+                    {activeTab === 'RADIAL' ? 'RADIAL ORBIT' : 'KEY HUBS ONLY'}
                   </span>
                 )}
               </div>
@@ -817,7 +1096,10 @@ export const NetworkHero: React.FC<NetworkHeroProps> = ({
           </div>
 
           {/* Sub-view Area */}
-          <div className="relative flex-1 min-h-[550px] rounded-lg bg-void/60 border border-signal/10 overflow-hidden grid-bg">
+          <div 
+            className="relative flex-1 min-h-[550px] rounded-lg bg-void/60 border border-signal/10 overflow-hidden grid-bg"
+            onWheel={activeTab === 'CANVAS' ? handleWheel : undefined}
+          >
             {activeTab === 'CANVAS' && (
               <>
                 <div className="absolute inset-0 graph-vignette pointer-events-none" />
@@ -854,9 +1136,17 @@ export const NetworkHero: React.FC<NetworkHeroProps> = ({
                 )}
 
                 <svg
-                  viewBox="0 0 100 100"
-                  className="absolute inset-0 size-full transition-transform duration-300"
-                  style={{ transform: `scale(${zoom})` }}
+                  viewBox={`0 0 ${canvasDimension} ${canvasDimension}`}
+                  className={`absolute inset-0 size-full select-none ${isPanning ? 'cursor-grabbing' : 'cursor-grab'}`}
+                  style={{ 
+                    transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                    transformOrigin: 'center center',
+                    transition: isPanning ? 'none' : 'transform 0.2s ease-out'
+                  }}
+                  onMouseDown={handleMouseDown}
+                  onMouseMove={handleMouseMove}
+                  onMouseUp={handleMouseUp}
+                  onMouseLeave={handleMouseUp}
                   aria-label="Interactive network canvas"
                 >
                   {/* Glow Filters for Animated Threads & Photons */}
@@ -897,7 +1187,7 @@ export const NetworkHero: React.FC<NetworkHeroProps> = ({
                           d={arcPath}
                           fill="none"
                           stroke="rgba(245, 158, 11, 0.4)"
-                          strokeWidth="2.5"
+                          strokeWidth={`${densityScale.strokeW * 2.8}px`}
                           strokeLinecap="round"
                           filter="url(#net-thread-glow)"
                         />
@@ -906,36 +1196,36 @@ export const NetworkHero: React.FC<NetworkHeroProps> = ({
                           d={arcPath}
                           fill="none"
                           stroke="#f59e0b"
-                          strokeWidth="1.2"
+                          strokeWidth={`${densityScale.strokeW * 1.4}px`}
                           strokeDasharray="3 2"
                           strokeLinecap="round"
                         />
                         {/* High-intensity traveling photon along the indirect arc */}
-                        <circle r="1.1" fill="#fef08a" filter="url(#net-packet-glow)">
+                        <circle r={densityScale.nodeR * 0.3} fill="#fef08a" filter="url(#net-packet-glow)">
                           <animateMotion dur="2.2s" repeatCount="indefinite" path={arcPath} />
                         </circle>
                         {/* Category Label Pill at Midpoint */}
                         <g transform={`translate(${mx}, ${my})`}>
                           <rect
-                            x="-16"
-                            y="-4"
-                            width="32"
-                            height="8"
-                            rx="2"
+                            x={-densityScale.fontSize * 3.8}
+                            y={-densityScale.fontSize * 1.2}
+                            width={densityScale.fontSize * 7.6}
+                            height={densityScale.fontSize * 2.2}
+                            rx={densityScale.fontSize * 0.6}
                             fill="#070d1e"
                             stroke="#f59e0b"
-                            strokeWidth="0.6"
+                            strokeWidth={densityScale.strokeW * 0.7}
                           />
                           <text
                             x="0"
-                            y="1.8"
+                            y={densityScale.fontSize * 0.45}
                             textAnchor="middle"
                             fill="#fbbf24"
-                            fontSize="3"
+                            fontSize={`${densityScale.fontSize * 0.75}px`}
                             fontFamily="monospace"
                             fontWeight="bold"
                           >
-                            {activeHiddenRelationship.categoryTitle.slice(0, 13)}
+                            {activeHiddenRelationship.categoryTitle.slice(0, 14)}
                           </text>
                         </g>
                       </g>
@@ -949,10 +1239,18 @@ export const NetworkHero: React.FC<NetworkHeroProps> = ({
                     const sPos = nodeLayout.get(edge.source) || (sNode ? { x: sNode.x, y: sNode.y } : null);
                     const tPos = nodeLayout.get(edge.target) || (tNode ? { x: tNode.x, y: tNode.y } : null);
                     if (!sPos || !tPos) return null;
-                    const isPathActive = pathSet.has(edge.source) && pathSet.has(edge.target);
+                    const isConsecutive = consecutivePathEdges.has(`${edge.source}__${edge.target}`);
+                    const isPathActive = isConsecutive && (showPath ? (pathSet.has(edge.source) && pathSet.has(edge.target)) : false);
                     const isLeadActive = Boolean(selectedLead);
-                    const isDimmedEdge = isLeadActive && !isPathActive;
+                    const isDimmedEdge = (isLeadActive || showPath) && !isPathActive;
                     const durationSec = isPathActive ? 1.6 : 3.2 + (idx % 4) * 0.7;
+
+                    // Ensure photon travels in downstream direction of path
+                    const srcIdx = effectiveHiddenPath.indexOf(edge.source);
+                    const tgtIdx = effectiveHiddenPath.indexOf(edge.target);
+                    const isForward = srcIdx !== -1 && tgtIdx !== -1 ? srcIdx < tgtIdx : true;
+                    const pStart = isForward ? sPos : tPos;
+                    const pEnd = isForward ? tPos : sPos;
 
                     return (
                       <g
@@ -964,30 +1262,51 @@ export const NetworkHero: React.FC<NetworkHeroProps> = ({
                         style={{ outline: 'none' }}
                       >
                         {/* Structural Base Thread */}
-                        <line x1={sPos.x} y1={sPos.y} x2={tPos.x} y2={tPos.y} className="thread-base" />
+                        <line
+                          x1={sPos.x}
+                          y1={sPos.y}
+                          x2={tPos.x}
+                          y2={tPos.y}
+                          className="thread-base"
+                          style={{ strokeWidth: `${densityScale.strokeW}px` }}
+                        />
                         
                         {/* Flowing Animated Dash Thread */}
-                        <line x1={sPos.x} y1={sPos.y} x2={tPos.x} y2={tPos.y} className="thread-pulse" />
+                        <line
+                          x1={sPos.x}
+                          y1={sPos.y}
+                          x2={tPos.x}
+                          y2={tPos.y}
+                          className="thread-pulse"
+                          style={{ strokeWidth: `${densityScale.strokeW * 1.3}px` }}
+                        />
 
-                        {/* Traveling Luminous Photon Particle ONLY along actively traced path edges */}
+                        {/* Traveling Luminous Photon Particle ONLY along actively traced consecutive path edges */}
                         {isPathActive && (
                           <circle
-                            r={0.85}
+                            r={densityScale.nodeR * 0.25}
                             fill="#00f0ff"
                             filter="url(#net-packet-glow)"
                             className="photon-particle"
                           >
                             <animateMotion
-                              dur="1.8s"
+                              dur="1.6s"
                               repeatCount="indefinite"
-                              path={`M ${sPos.x} ${sPos.y} L ${tPos.x} ${tPos.y}`}
+                              path={`M ${pStart.x} ${pStart.y} L ${pEnd.x} ${pEnd.y}`}
                             />
                           </circle>
                         )}
 
-                        <text x={(sPos.x + tPos.x) / 2} y={(sPos.y + tPos.y) / 2 - 1} className="edge-label">
-                          {edge.label}
-                        </text>
+                        {displayedNodes.length <= 25 && (
+                          <text
+                            x={(sPos.x + tPos.x) / 2}
+                            y={(sPos.y + tPos.y) / 2 - 1}
+                            className="edge-label"
+                            style={{ fontSize: `${densityScale.fontSize * 0.7}px` }}
+                          >
+                            {edge.label}
+                          </text>
+                        )}
                       </g>
                     );
                   })}
@@ -1015,7 +1334,7 @@ export const NetworkHero: React.FC<NetworkHeroProps> = ({
                         {/* Active Status Radar Wave Halo */}
                         {isActive && (
                           <circle
-                            r={5}
+                            r={densityScale.activeR * 1.3}
                             fill="none"
                             stroke="#00f0ff"
                             className="active-radar-ring"
@@ -1023,14 +1342,14 @@ export const NetworkHero: React.FC<NetworkHeroProps> = ({
                         )}
 
                         {/* Main Node Circle */}
-                        <circle r={isActive ? 5.5 : 4} />
+                        <circle r={isActive ? densityScale.activeR : densityScale.nodeR} />
 
                         {/* Active Status Beacon Dot */}
                         {isActive && (
                           <circle
-                            cx={3.8}
-                            cy={-3.8}
-                            r={1.2}
+                            cx={densityScale.activeR * 0.7}
+                            cy={-densityScale.activeR * 0.7}
+                            r={densityScale.nodeR * 0.28}
                             fill="#00f0ff"
                             filter="url(#net-thread-glow)"
                             className="blink"
@@ -1038,41 +1357,45 @@ export const NetworkHero: React.FC<NetworkHeroProps> = ({
                         )}
 
                         <text
-                          y="9"
+                          y={densityScale.labelY}
                           className={`node-name ${isActive ? 'font-semibold' : ''}`}
-                          style={{ fill: isActive ? '#ffffff' : undefined }}
+                          style={{ fontSize: `${densityScale.fontSize}px`, fill: isActive ? '#ffffff' : undefined }}
                         >
-                          {node.name}
+                          {formatNodeName(node, densityScale.maxChars)}
                         </text>
 
                         {/* Active Status Badge Pill vs Regular Type Label */}
                         {isActive ? (
-                          <g transform="translate(0, 13)">
+                          <g transform={`translate(0, ${densityScale.labelY + densityScale.fontSize * 1.1})`}>
                             <rect
-                              x="-8"
-                              y="-2"
-                              width="16"
-                              height="3.2"
-                              rx="1.6"
+                              x={-densityScale.fontSize * 2.2}
+                              y={-densityScale.fontSize * 0.6}
+                              width={densityScale.fontSize * 4.4}
+                              height={densityScale.fontSize * 1.1}
+                              rx={densityScale.fontSize * 0.5}
                               fill="rgba(0, 240, 255, 0.22)"
                               stroke="rgba(0, 240, 255, 0.75)"
-                              strokeWidth="0.3"
+                              strokeWidth={densityScale.strokeW * 0.5}
                             />
                             <text
-                              y="0.3"
+                              y={densityScale.fontSize * 0.2}
                               fill="#00f0ff"
-                              fontSize="1.5"
+                              fontSize={`${densityScale.fontSize * 0.55}px`}
                               textAnchor="middle"
                               fontFamily="var(--font-mono)"
                               fontWeight="bold"
                               letterSpacing="0.05em"
                             >
-                              ● ACTIVE
+                              FOCUSED
                             </text>
                           </g>
                         ) : (
-                          <text y="12.8" className="node-type">
-                            {node.type}
+                          <text
+                            y={densityScale.labelY + densityScale.fontSize * 0.9}
+                            className="node-sub"
+                            style={{ fontSize: `${densityScale.fontSize * 0.65}px` }}
+                          >
+                            {formatNodeSubLabel(node)}
                           </text>
                         )}
                       </g>
@@ -1083,30 +1406,35 @@ export const NetworkHero: React.FC<NetworkHeroProps> = ({
                 {/* Canvas Zoom Controls */}
                 <div className="absolute bottom-3 left-3 flex gap-1.5 z-10">
                   <button
-                    onClick={() => setZoom((z) => Math.min(1.4, z + 0.1))}
-                    className="grid size-8 place-items-center rounded border border-signal/15 bg-panel/80 text-foreground hover:bg-signal/20 transition"
-                    title="Zoom in"
+                    onClick={handleZoomIn}
+                    className="grid size-8 place-items-center rounded border border-signal/20 bg-panel/85 text-foreground hover:bg-signal/20 transition shadow-lg backdrop-blur-md"
+                    title="Zoom in (or scroll wheel up)"
+                    aria-label="Zoom in"
                   >
-                    <ZoomIn className="size-3.5" />
+                    <ZoomIn className="size-3.5 text-signal" />
                   </button>
                   <button
-                    onClick={() => setZoom((z) => Math.max(0.7, z - 0.1))}
-                    className="grid size-8 place-items-center rounded border border-signal/15 bg-panel/80 text-foreground hover:bg-signal/20 transition"
-                    title="Zoom out"
+                    onClick={handleZoomOut}
+                    className="grid size-8 place-items-center rounded border border-signal/20 bg-panel/85 text-foreground hover:bg-signal/20 transition shadow-lg backdrop-blur-md"
+                    title="Zoom out (or scroll wheel down)"
+                    aria-label="Zoom out"
                   >
-                    <ZoomOut className="size-3.5" />
+                    <ZoomOut className="size-3.5 text-signal" />
                   </button>
                   <button
-                    onClick={() => setZoom(1)}
-                    className="grid size-8 place-items-center rounded border border-signal/15 bg-panel/80 text-foreground hover:bg-signal/20 transition"
-                    title="Reset zoom"
+                    onClick={handleResetZoom}
+                    className="grid size-8 place-items-center rounded border border-signal/20 bg-panel/85 text-foreground hover:bg-signal/20 transition shadow-lg backdrop-blur-md"
+                    title="Reset zoom & center pan"
+                    aria-label="Reset zoom"
                   >
-                    <RotateCcw className="size-3.5" />
+                    <RotateCcw className="size-3.5 text-signal" />
                   </button>
                 </div>
 
-                <div className="absolute bottom-3 right-3 font-mono text-[10px] text-muted-foreground border border-signal/10 bg-panel/70 rounded px-2 py-1 z-10">
-                  {Math.round(zoom * 100)}% · pan enabled
+                <div className="absolute bottom-3 right-3 font-mono text-[10px] text-muted-foreground border border-signal/15 bg-panel/80 rounded px-2.5 py-1 z-10 shadow-md backdrop-blur-md flex items-center gap-1.5">
+                  <span className="text-signal font-semibold">{Math.round(zoom * 100)}%</span>
+                  <span>·</span>
+                  <span>drag to pan</span>
                 </div>
 
                 {/* Alert Badge on Path Reveal */}
@@ -1121,11 +1449,13 @@ export const NetworkHero: React.FC<NetworkHeroProps> = ({
             {/* Radial Orbit Sub-Graph View */}
             {activeTab === 'RADIAL' && (
               <EgoCentricRadialGraph
-                centerEntityId={effectiveSelectedNodeId}
+                centerEntityId={mainLeadEntityId}
                 selectedEntityId={inspectingEntityId || effectiveSelectedNodeId}
                 onSelectEntity={handleEntitySelect}
                 onSelectEdgeRecord={(recId) => setActiveEvidenceId(recId)}
-                zoom={zoom}
+                entityLimit={entityLimit}
+                leadPathNodeIds={effectiveHiddenPath}
+                onNodesCountChange={setRadialNodesCount}
               />
             )}
 
@@ -1166,7 +1496,7 @@ export const NetworkHero: React.FC<NetworkHeroProps> = ({
               <div className="text-[10px] tracking-[0.22em] font-mono text-signal/70">
                 ENTITY FOCUS
               </div>
-              <span className="text-[10px] font-mono text-muted-foreground">{selectedNode?.id}</span>
+              <span className="text-[10px] font-mono text-muted-foreground">{selectedNode ? formatNodeSubLabel(selectedNode) : ''}</span>
             </div>
 
             <div className="flex items-center gap-3">
@@ -1179,7 +1509,7 @@ export const NetworkHero: React.FC<NetworkHeroProps> = ({
               </div>
               <div>
                 <div className="font-display text-base font-semibold text-foreground">
-                  {selectedNode?.name}
+                  {getEntityDisplayName(selectedNode)}
                 </div>
                 <div className="text-[10px] font-mono text-muted-foreground">
                   {selectedNode?.type} · {selectedNode?.subtitle}
@@ -1197,8 +1527,8 @@ export const NetworkHero: React.FC<NetworkHeroProps> = ({
                 <div className="text-[11px] mt-0.5 text-foreground">{selectedNode?.cases ?? 0}</div>
               </div>
               <div>
-                <div className="font-mono text-[10px] text-muted-foreground">ENTITY ID</div>
-                <div className="text-[11px] mt-0.5 text-foreground">{selectedNode?.id}</div>
+                <div className="font-mono text-[10px] text-muted-foreground">IDENTIFIER</div>
+                <div className="text-[11px] mt-0.5 text-foreground">{selectedNode ? formatNodeSubLabel(selectedNode) : ''}</div>
               </div>
               <div>
                 <div className="font-mono text-[10px] text-muted-foreground">RESOLUTION</div>
@@ -1289,7 +1619,7 @@ export const NetworkHero: React.FC<NetworkHeroProps> = ({
                         <div className="flex items-center gap-2">
                           <span className="font-mono text-xs font-bold text-warn">#{idx + 1}</span>
                           <span className="font-semibold text-xs text-foreground">
-                            {lead.target_entity?.name || lead.target_entity?.id}
+                            {getEntityDisplayName(lead.target_entity || lead.targetEntityId || lead.target_entity?.id)}
                           </span>
                         </div>
                         <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-panel/60 border border-signal/20 text-signal">
@@ -1449,15 +1779,15 @@ export const NetworkHero: React.FC<NetworkHeroProps> = ({
                   <div>
                     {activeHiddenRelationship ? (
                       <span>
-                        {activeHiddenRelationship.sourceNodeName}{' '}
+                        {getEntityDisplayName(activeHiddenRelationship.sourceNodeName || activeHiddenRelationship.sourceId)}{' '}
                         <span className="text-warn">↔</span>{' '}
-                        {activeHiddenRelationship.targetNodeName}
+                        {getEntityDisplayName(activeHiddenRelationship.targetNodeName || activeHiddenRelationship.targetId)}
                       </span>
                     ) : (
                       <span>
-                        {allNodes.find((n) => n.id === effectiveHiddenPath[0])?.name || allNodes[0]?.name || 'Primary Subject'}{' '}
+                        {getEntityDisplayName(allNodes.find((n) => n.id === effectiveHiddenPath[0]) || effectiveHiddenPath[0])}{' '}
                         <span className="text-warn">↔</span>{' '}
-                        {allNodes.find((n) => n.id === effectiveHiddenPath[effectiveHiddenPath.length - 1])?.name || allNodes[1]?.name || 'Target Subject'}
+                        {getEntityDisplayName(allNodes.find((n) => n.id === effectiveHiddenPath[effectiveHiddenPath.length - 1]) || effectiveHiddenPath[effectiveHiddenPath.length - 1])}
                       </span>
                     )}
                   </div>
@@ -1478,6 +1808,8 @@ export const NetworkHero: React.FC<NetworkHeroProps> = ({
                 <div className="mt-4 space-y-1.5">
                   {effectiveHiddenPath.map((nodeId, idx) => {
                     const n = allNodes.find((t) => t.id === nodeId);
+                    const displayName = getEntityDisplayName(n || nodeId);
+                    const subLabel = n ? formatNodeSubLabel(n) : getCanonicalEntity(nodeId)?.subtitle || '';
                     return (
                       <button
                         key={`${nodeId}-${idx}`}
@@ -1491,11 +1823,11 @@ export const NetworkHero: React.FC<NetworkHeroProps> = ({
                             : 'bg-panel/40 border-signal/10 text-muted-foreground hover:border-signal/30 hover:text-foreground'
                         }`}
                       >
-                        <span className="flex items-center gap-1.5">
-                          <span className="text-signal/60 font-mono">{idx + 1}.</span>
-                          <span className="font-medium text-foreground">{n?.name || nodeId}</span>
+                        <span className="flex items-center gap-1.5 min-w-0">
+                          <span className="text-signal/60 font-mono shrink-0">{idx + 1}.</span>
+                          <span className="font-medium text-foreground truncate">{displayName}</span>
                         </span>
-                        <span className="text-[10px] text-muted-foreground">{n?.type}</span>
+                        <span className="text-[10px] text-muted-foreground shrink-0">{subLabel}</span>
                       </button>
                     );
                   })}
@@ -1527,6 +1859,7 @@ export const NetworkHero: React.FC<NetworkHeroProps> = ({
         <InvestigativeSuggestions
           onApplySuggestion={handleApplySuggestion}
           activeSuggestionId={activeSuggestionId}
+          suggestions={dataDrivenSuggestions}
         />
       </section>
 
@@ -1539,16 +1872,20 @@ export const NetworkHero: React.FC<NetworkHeroProps> = ({
             onChange={(e) => setCommandInput(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && commandInput.trim()) {
+                const q = commandInput.trim().toLowerCase();
                 const matched = allNodes.find((n) =>
-                  n.name.toLowerCase().includes(commandInput.toLowerCase())
+                  n.name.toLowerCase().includes(q) ||
+                  n.id.toLowerCase() === q ||
+                  n.id.toLowerCase().includes(q)
                 );
                 if (matched) {
                   setSelectedNodeId(matched.id);
+                  setInspectingEntityId(matched.id);
                 }
               }
             }}
             className="flex-1 bg-transparent text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none border-0"
-            placeholder="Ask the investigation system… (e.g. Trace Rahul ↔ Amit, or click a quick suggestion chip)"
+            placeholder="Ask the investigation system… (e.g. Trace Garima ↔ Shailesh, find vehicle nexus, or click a suggestion)"
           />
           <span className="hidden md:block text-[10px] font-mono text-muted-foreground px-2 py-1 rounded border border-signal/15">
             STRUCTURED INQUIRY
@@ -1556,11 +1893,15 @@ export const NetworkHero: React.FC<NetworkHeroProps> = ({
           <button
             onClick={() => {
               if (commandInput.trim()) {
+                const q = commandInput.trim().toLowerCase();
                 const matched = allNodes.find((n) =>
-                  n.name.toLowerCase().includes(commandInput.toLowerCase())
+                  n.name.toLowerCase().includes(q) ||
+                  n.id.toLowerCase() === q ||
+                  n.id.toLowerCase().includes(q)
                 );
                 if (matched) {
                   setSelectedNodeId(matched.id);
+                  setInspectingEntityId(matched.id);
                 }
               }
             }}
@@ -1573,10 +1914,13 @@ export const NetworkHero: React.FC<NetworkHeroProps> = ({
         {/* Quick Suggestion Chips */}
         <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-signal/10 text-xs font-mono">
           <span className="text-[10px] text-muted-foreground">SUGGESTED QUERIES:</span>
-          {allSuggestions.slice(0, 3).map((sug) => (
+          {dataDrivenSuggestions.map((sug) => (
             <button
               key={sug.id}
-              onClick={() => handleApplySuggestion(sug)}
+              onClick={() => {
+                setCommandInput(sug.actionLabel || sug.title);
+                handleApplySuggestion(sug);
+              }}
               className="px-2 py-0.5 rounded bg-signal/10 text-signal border border-signal/25 hover:bg-signal/20 transition text-[11px]"
             >
               {sug.actionLabel || sug.title}

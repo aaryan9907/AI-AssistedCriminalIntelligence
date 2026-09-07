@@ -53,7 +53,7 @@ function AppContent() {
   // If focusEntityId is null or not in nodes, fallback to first node
   const effectiveFocusId = focusEntityId && nodes.some(n => n.id === focusEntityId)
     ? focusEntityId
-    : (nodes[0]?.id || 'P-014');
+    : (nodes[0]?.id || 'P003');
 
   const currentHeader = SECTION_HEADERS[currentSection] || SECTION_HEADERS.COMMAND_CENTER;
   const activeModalRecord = activeEvidenceModalId
@@ -87,48 +87,50 @@ function AppContent() {
             activeCase={isCustomDataset ? activeDatasetName : activeCaseId}
           />
 
-          {/* Dynamic Content Views */}
+          {/* Dynamic Content Views with Smooth Tab Transition */}
           <div className="flex-1 overflow-y-auto">
-            {currentSection === 'COMMAND_CENTER' && (
-              <CommandCenter
-                onNavigate={setCurrentSection}
-                onSelectEntity={handleSelectEntity}
-              />
-            )}
+            <div key={currentSection} className="animate-tab-transition">
+              {currentSection === 'COMMAND_CENTER' && (
+                <CommandCenter
+                  onNavigate={setCurrentSection}
+                  onSelectEntity={handleSelectEntity}
+                />
+              )}
 
-            {currentSection === 'DATA_INGESTION' && (
-              <DataIngestionView
-                onNavigate={setCurrentSection}
-              />
-            )}
+              {currentSection === 'DATA_INGESTION' && (
+                <DataIngestionView
+                  onNavigate={setCurrentSection}
+                />
+              )}
 
-            {currentSection === 'ENTITIES' && (
-              <EntitiesExplorer
-                focusId={effectiveFocusId}
-                onSelectEntity={handleSelectEntity}
-                onNavigate={setCurrentSection}
-              />
-            )}
+              {currentSection === 'ENTITIES' && (
+                <EntitiesExplorer
+                  focusId={effectiveFocusId}
+                  onSelectEntity={handleSelectEntity}
+                  onNavigate={setCurrentSection}
+                />
+              )}
 
-            {currentSection === 'NETWORK' && (
-              <NetworkHero
-                initialSelectedEntityId={effectiveFocusId}
-                onNavigate={setCurrentSection}
-              />
-            )}
+              {currentSection === 'NETWORK' && (
+                <NetworkHero
+                  initialSelectedEntityId={effectiveFocusId}
+                  onNavigate={setCurrentSection}
+                />
+              )}
 
-            {currentSection === 'LEADS' && (
-              <LeadsView
-                onNavigate={setCurrentSection}
-                onOpenEvidenceModal={(id) => setActiveEvidenceModalId(id)}
-              />
-            )}
+              {currentSection === 'LEADS' && (
+                <LeadsView
+                  onNavigate={setCurrentSection}
+                  onOpenEvidenceModal={(id) => setActiveEvidenceModalId(id)}
+                />
+              )}
 
-            {currentSection === 'EVIDENCE' && (
-              <EvidenceTimelineView
-                onOpenEvidenceModal={(id) => setActiveEvidenceModalId(id)}
-              />
-            )}
+              {currentSection === 'EVIDENCE' && (
+                <EvidenceTimelineView
+                  onOpenEvidenceModal={(id) => setActiveEvidenceModalId(id)}
+                />
+              )}
+            </div>
           </div>
         </div>
       </div>

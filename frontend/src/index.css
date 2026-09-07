@@ -324,3 +324,19 @@ svg *,
 .blink {
   animation: 1.8s ease-in-out infinite softblink;
 }
+
+/* Smooth Tab & View Transition Animations */
+@keyframes tabFadeSlide {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-tab-transition {
+  animation: tabFadeSlide 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}

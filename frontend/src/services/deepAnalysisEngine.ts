@@ -460,6 +460,202 @@ export function findDeepPathsBetween(
 }
 
 /**
+ * Finds hidden paths up to `maxHops` starting from a given entity to any indirectly connected target entity.
+ */
+export function findHiddenPathsForEntity(
+  entityId: string,
+  nodes: NexusNode[],
+  edges: NexusEdge[],
+  maxHops: number = 4
+): DiscoveredHiddenRelationship[] {
+  const nodeMap = new Map<string, NexusNode>();
+  nodes.forEach((n) => nodeMap.set(n.id, n));
+  const srcNode = nodeMap.get(entityId);
+  if (!srcNode) return [];
+
+  const adj = new Map<string, Array<{ neighborId: string; edge: NexusEdge }>>();
+  const directNeighbors = new Set<string>();
+  edges.forEach((e) => {
+    if (!adj.has(e.source)) adj.set(e.source, []);
+    if (!adj.has(e.target)) adj.set(e.target, []);
+    adj.get(e.source)!.push({ neighborId: e.target, edge: e });
+    adj.get(e.target)!.push({ neighborId: e.source, edge: e });
+    if (e.source === entityId) directNeighbors.add(e.target);
+    if (e.target === entityId) directNeighbors.add(e.source);
+  });
+
+  const discoveredPaths: DiscoveredHiddenRelationship[] = [];
+  const visitedTargets = new Set<string>();
+
+  interface QueueItem {
+    currentId: string;
+    pathNodes: string[];
+    pathEdges: NexusEdge[];
+  }
+
+  const queue: QueueItem[] = [{ currentId: entityId, pathNodes: [entityId], pathEdges: [] }];
+
+  while (queue.length > 0 && discoveredPaths.length < 5) {
+    const { currentId, pathNodes, pathEdges } = queue.shift()!;
+
+    // If reached an entity at 2+ hops that is NOT directly connected to source
+    if (pathNodes.length >= 3 && !directNeighbors.has(currentId) && !visitedTargets.has(currentId)) {
+      const tgtNode = nodeMap.get(currentId);
+      if (tgtNode) {
+        visitedTargets.add(currentId);
+        const hops = pathNodes.length - 1;
+        let confProduct = 1.0;
+        pathEdges.forEach((e) => {
+          confProduct *= e.confidence || 0.85;
+        });
+        const hopDiscount = 1 - (hops - 1) * 0.04;
+        const finalConfidence = Math.max(0.65, Math.min(0.98, confProduct * hopDiscount));
+
+        const steps: PathStep[] = [];
+        for (let s = 0; s < pathNodes.length; s++) {
+          const nId = pathNodes[s];
+          const n = nodeMap.get(nId)!;
+          const step: PathStep = {
+            entityId: n.id,
+            entityName: n.name,
+            entityType: n.type
+          };
+          if (s < pathEdges.length) {
+            const e = pathEdges[s];
+            step.viaEdgeLabel = e.label;
+            step.viaCategory = e.category;
+            step.viaEvidenceId = e.recordId;
+            step.confidence = e.confidence;
+          }
+          steps.push(step);
+        }
+
+        const intermediaries = pathNodes.slice(1, -1).map((id) => {
+          const n = nodeMap.get(id)!;
+          return {
+            id: n.id,
+            name: n.name,
+            type: n.type,
+            role: n.subtitle
+          };
+        });
+
+        const trailName = intermediaries.map((i) => i.name).join(' ➔ ');
+        const title = `${hops}-Hop Hidden Trail: ${srcNode.name} ↔ ${tgtNode.name}`;
+        const narrative = `Discovered indirect link across ${hops} hops via [${trailName}]. No direct record links these two subjects, but cross-referencing multi-modal intelligence establishes an investigative connection.`;
+
+        discoveredPaths.push({
+          id: `DISCOVERED-${entityId}-${currentId}`,
+          sourceId: entityId,
+          targetId: currentId,
+          sourceNodeId: entityId,
+          targetNodeId: currentId,
+          sourceName: srcNode.name,
+          targetName: tgtNode.name,
+          sourceNodeName: srcNode.name,
+          targetNodeName: tgtNode.name,
+          sourceType: srcNode.type,
+          targetType: tgtNode.type,
+          category: 'MULTI_HOP_TRAIL',
+          categoryLabel: `${hops}-HOP TRAIL`,
+          categoryTitle: `${hops}-HOP INDIRECT TRAIL`,
+          title,
+          narrative,
+          discoverySummary: narrative,
+          confidence: Number(finalConfidence.toFixed(2)),
+          hops,
+          hopCount: hops,
+          pathNodeIds: [...pathNodes],
+          pathEdgeIds: pathEdges.map((e) => e.id),
+          pathSteps: steps,
+          pathBreadcrumb: steps,
+          intermediaryEntities: intermediaries,
+          intermediaryValue: intermediaries[0]?.name,
+          corroboratingEvidenceCount: pathEdges.length,
+          evidenceRecordIds: pathEdges.map((e) => e.recordId),
+          evidenceSnippets: pathEdges.map((e, idx) => {
+            const sName = nodeMap.get(pathNodes[idx])?.name || pathNodes[idx];
+            const tName = nodeMap.get(pathNodes[idx + 1])?.name || pathNodes[idx + 1];
+            return `${e.label}: ${sName} ↔ ${tName} (${e.sourceType || 'Intelligence Log'})`;
+          }),
+          caseDocket: pathEdges[0]?.caseId || 'CASE01',
+          riskRating: finalConfidence > 0.8 ? 'HIGH' : 'MEDIUM',
+          detectedAt: pathEdges[pathEdges.length - 1]?.date || '2026-02-15'
+        });
+      }
+    }
+
+    if (pathNodes.length - 1 >= maxHops) continue;
+
+    const neighbors = adj.get(currentId) || [];
+    for (const { neighborId, edge } of neighbors) {
+      if (!pathNodes.includes(neighborId)) {
+        queue.push({
+          currentId: neighborId,
+          pathNodes: [...pathNodes, neighborId],
+          pathEdges: [...pathEdges, edge]
+        });
+      }
+    }
+  }
+
+  // Fallback if no indirect target: provide 1-hop primary link to top connected neighbor
+  if (discoveredPaths.length === 0 && directNeighbors.size > 0) {
+    const neighborsList = (adj.get(entityId) || []).sort((a, b) => {
+      const nA = nodeMap.get(a.neighborId)?.connections || 0;
+      const nB = nodeMap.get(b.neighborId)?.connections || 0;
+      return nB - nA;
+    });
+    if (neighborsList.length > 0) {
+      const topN = neighborsList[0];
+      const tgtNode = nodeMap.get(topN.neighborId);
+      if (tgtNode) {
+        const steps: PathStep[] = [
+          { entityId: srcNode.id, entityName: srcNode.name, entityType: srcNode.type, viaEdgeLabel: topN.edge.label, viaCategory: topN.edge.category, viaEvidenceId: topN.edge.recordId, confidence: topN.edge.confidence },
+          { entityId: tgtNode.id, entityName: tgtNode.name, entityType: tgtNode.type }
+        ];
+        discoveredPaths.push({
+          id: `DIRECT-LINK-${entityId}-${tgtNode.id}`,
+          sourceId: entityId,
+          targetId: tgtNode.id,
+          sourceNodeId: entityId,
+          targetNodeId: tgtNode.id,
+          sourceName: srcNode.name,
+          targetName: tgtNode.name,
+          sourceNodeName: srcNode.name,
+          targetNodeName: tgtNode.name,
+          sourceType: srcNode.type,
+          targetType: tgtNode.type,
+          category: 'CRITICAL_BROKER',
+          categoryLabel: 'PRIMARY LINK',
+          categoryTitle: 'DIRECT OPERATIONAL EDGE',
+          title: `Primary Connection: ${srcNode.name} ↔ ${tgtNode.name}`,
+          narrative: `Direct operational record link between ${srcNode.name} and ${tgtNode.name} via ${topN.edge.label}.`,
+          discoverySummary: `Corroborated by ${topN.edge.recordId}.`,
+          confidence: topN.edge.confidence || 0.95,
+          hops: 1,
+          hopCount: 1,
+          pathNodeIds: [entityId, tgtNode.id],
+          pathEdgeIds: [topN.edge.id],
+          pathSteps: steps,
+          pathBreadcrumb: steps,
+          intermediaryEntities: [],
+          intermediaryValue: tgtNode.name,
+          corroboratingEvidenceCount: 1,
+          evidenceRecordIds: [topN.edge.recordId],
+          evidenceSnippets: [`${topN.edge.label}: ${srcNode.name} ↔ ${tgtNode.name}`],
+          caseDocket: topN.edge.caseId || 'CASE01',
+          riskRating: 'HIGH',
+          detectedAt: topN.edge.date || '2026-02-15'
+        });
+      }
+    }
+  }
+
+  return discoveredPaths;
+}
+
+/**
  * Pre-computed high-fidelity baseline hidden relationships for default demo data
  */
 export const BASELINE_HIDDEN_RELATIONSHIPS: DiscoveredHiddenRelationship[] = [
@@ -479,8 +675,8 @@ export const BASELINE_HIDDEN_RELATIONSHIPS: DiscoveredHiddenRelationship[] = [
     categoryLabel: '4-HOP MULTI-MODAL TRAIL',
     categoryTitle: '4-HOP INDIRECT SUSPECT TRAIL',
     title: 'Primary Coordination Conduit: Rahul Sharma ↔ Amit Kumar',
-    narrative: 'Cross-docket link discovered across 4 distinct intelligence hops: Rahul Sharma contacted Burner Phone X, which communicated with Vikram Singh, who operates Vehicle V co-occupied by Amit Kumar. No direct communication exists between Rahul and Amit.',
-    discoverySummary: 'Cross-docket link discovered across 4 distinct intelligence hops: Rahul Sharma contacted Burner Phone X, which communicated with Vikram Singh, who operates Vehicle V co-occupied by Amit Kumar. No direct communication exists between Rahul and Amit.',
+    narrative: 'Cross-docket link discovered across 4 distinct intelligence hops: Rahul Sharma contacted +91 98201-00421 (Rahul\'s Phone), which communicated with Vikram Singh, who operates Mahindra Scorpio (MH-04-KX-2311) co-occupied by Amit Kumar. No direct communication exists between Rahul and Amit.',
+    discoverySummary: 'Cross-docket link discovered across 4 distinct intelligence hops: Rahul Sharma contacted +91 98201-00421 (Rahul\'s Phone), which communicated with Vikram Singh, who operates Mahindra Scorpio (MH-04-KX-2311) co-occupied by Amit Kumar. No direct communication exists between Rahul and Amit.',
     confidence: 0.94,
     hops: 4,
     hopCount: 4,
@@ -488,31 +684,31 @@ export const BASELINE_HIDDEN_RELATIONSHIPS: DiscoveredHiddenRelationship[] = [
     pathEdgeIds: ['e1', 'e2', 'e3', 'e4'],
     pathSteps: [
       { entityId: 'P-014', entityName: 'Rahul Sharma', entityType: 'PERSON', viaEdgeLabel: 'COMMUNICATED_WITH', viaCategory: 'COMMUNICATION', viaEvidenceId: 'CDR-0087', confidence: 0.94 },
-      { entityId: 'PH-021', entityName: 'Phone X', entityType: 'PHONE', viaEdgeLabel: 'COMMUNICATED_WITH', viaCategory: 'COMMUNICATION', viaEvidenceId: 'CDR-0112', confidence: 0.91 },
+      { entityId: 'PH-021', entityName: '+91 98201-00421 (Rahul\'s Phone)', entityType: 'PHONE', viaEdgeLabel: 'COMMUNICATED_WITH', viaCategory: 'COMMUNICATION', viaEvidenceId: 'CDR-0112', confidence: 0.91 },
       { entityId: 'P-037', entityName: 'Vikram Singh', entityType: 'PERSON', viaEdgeLabel: 'USES', viaCategory: 'VEHICLE', viaEvidenceId: 'VEH-0231', confidence: 0.88 },
-      { entityId: 'V-009', entityName: 'Vehicle V', entityType: 'VEHICLE', viaEdgeLabel: 'OBSERVED_WITH', viaCategory: 'VEHICLE', viaEvidenceId: 'VEH-0240', confidence: 0.86 },
+      { entityId: 'V-009', entityName: 'Mahindra Scorpio (MH-04-KX-2311)', entityType: 'VEHICLE', viaEdgeLabel: 'OBSERVED_WITH', viaCategory: 'VEHICLE', viaEvidenceId: 'VEH-0240', confidence: 0.86 },
       { entityId: 'P-052', entityName: 'Amit Kumar', entityType: 'PERSON' }
     ],
     pathBreadcrumb: [
       { entityId: 'P-014', entityName: 'Rahul Sharma', entityType: 'PERSON', viaEdgeLabel: 'COMMUNICATED_WITH', viaCategory: 'COMMUNICATION', viaEvidenceId: 'CDR-0087', confidence: 0.94 },
-      { entityId: 'PH-021', entityName: 'Phone X', entityType: 'PHONE', viaEdgeLabel: 'COMMUNICATED_WITH', viaCategory: 'COMMUNICATION', viaEvidenceId: 'CDR-0112', confidence: 0.91 },
+      { entityId: 'PH-021', entityName: '+91 98201-00421 (Rahul\'s Phone)', entityType: 'PHONE', viaEdgeLabel: 'COMMUNICATED_WITH', viaCategory: 'COMMUNICATION', viaEvidenceId: 'CDR-0112', confidence: 0.91 },
       { entityId: 'P-037', entityName: 'Vikram Singh', entityType: 'PERSON', viaEdgeLabel: 'USES', viaCategory: 'VEHICLE', viaEvidenceId: 'VEH-0231', confidence: 0.88 },
-      { entityId: 'V-009', entityName: 'Vehicle V', entityType: 'VEHICLE', viaEdgeLabel: 'OBSERVED_WITH', viaCategory: 'VEHICLE', viaEvidenceId: 'VEH-0240', confidence: 0.86 },
+      { entityId: 'V-009', entityName: 'Mahindra Scorpio (MH-04-KX-2311)', entityType: 'VEHICLE', viaEdgeLabel: 'OBSERVED_WITH', viaCategory: 'VEHICLE', viaEvidenceId: 'VEH-0240', confidence: 0.86 },
       { entityId: 'P-052', entityName: 'Amit Kumar', entityType: 'PERSON' }
     ],
     intermediaryEntities: [
-      { id: 'PH-021', name: 'Phone X', type: 'PHONE', role: '+91 98••• 0421 (Burner SIM)' },
+      { id: 'PH-021', name: '+91 98201-00421 (Rahul\'s Phone)', type: 'PHONE', role: '+91 98201-00421 (Burner SIM)' },
       { id: 'P-037', name: 'Vikram Singh', type: 'PERSON', role: 'Syndicate Intermediary' },
-      { id: 'V-009', name: 'Vehicle V', type: 'VEHICLE', role: 'MH 04 KX 231 (Transit Asset)' }
+      { id: 'V-009', name: 'Mahindra Scorpio (MH-04-KX-2311)', type: 'VEHICLE', role: 'MH 04 KX 2311 (Transit Asset)' }
     ],
-    intermediaryValue: 'Phone X (Burner SIM)',
+    intermediaryValue: '+91 98201-00421 (Burner SIM)',
     corroboratingEvidenceCount: 4,
     evidenceRecordIds: ['CDR-0087', 'CDR-0112', 'VEH-0231', 'VEH-0240'],
     evidenceSnippets: [
-      'CDR-0087: Telecom CDR logs voice call between Rahul Sharma and Phone X',
-      'CDR-0112: Telecom CDR logs secondary voice call between Phone X and Vikram Singh',
-      'VEH-0231: Field observation confirms Vikram Singh operating Vehicle V',
-      'VEH-0240: ANPR / CCTV sighting captures Amit Kumar occupying Vehicle V'
+      'CDR-0087: Telecom CDR logs voice call between Rahul Sharma and +91 98201-00421 (Rahul\'s Phone)',
+      'CDR-0112: Telecom CDR logs secondary voice call between +91 98201-00421 and Vikram Singh',
+      'VEH-0231: Field observation confirms Vikram Singh operating Mahindra Scorpio (MH-04-KX-2311)',
+      'VEH-0240: ANPR / CCTV sighting captures Amit Kumar occupying Mahindra Scorpio'
     ],
     caseDocket: 'CR-2026-0142',
     riskRating: 'HIGH',
@@ -534,8 +730,8 @@ export const BASELINE_HIDDEN_RELATIONSHIPS: DiscoveredHiddenRelationship[] = [
     categoryLabel: 'SHARED PHONE',
     categoryTitle: 'SHARED PHONE CONDUIT',
     title: 'Shared Communications Conduit: Rahul Sharma ↔ Vikram Singh',
-    narrative: 'Both Rahul Sharma and Vikram Singh communicate through burner phone device Phone X (+91 98••• 0421). No direct communication exists between the two suspects, pointing to a covert communication proxy relay.',
-    discoverySummary: 'Both Rahul Sharma and Vikram Singh communicate through burner phone device Phone X (+91 98••• 0421). No direct communication exists between the two suspects, pointing to a covert communication proxy relay.',
+    narrative: 'Both Rahul Sharma and Vikram Singh communicate through burner phone device +91 98201-00421 (Rahul\'s Phone). No direct communication exists between the two suspects, pointing to a covert communication proxy relay.',
+    discoverySummary: 'Both Rahul Sharma and Vikram Singh communicate through burner phone device +91 98201-00421 (Rahul\'s Phone). No direct communication exists between the two suspects, pointing to a covert communication proxy relay.',
     confidence: 0.93,
     hops: 2,
     hopCount: 2,
@@ -543,23 +739,23 @@ export const BASELINE_HIDDEN_RELATIONSHIPS: DiscoveredHiddenRelationship[] = [
     pathEdgeIds: ['e1', 'e2'],
     pathSteps: [
       { entityId: 'P-014', entityName: 'Rahul Sharma', entityType: 'PERSON', viaEdgeLabel: 'COMMUNICATED_WITH', viaCategory: 'COMMUNICATION', viaEvidenceId: 'CDR-0087', confidence: 0.94 },
-      { entityId: 'PH-021', entityName: 'Phone X', entityType: 'PHONE', viaEdgeLabel: 'COMMUNICATED_WITH', viaCategory: 'COMMUNICATION', viaEvidenceId: 'CDR-0112', confidence: 0.91 },
+      { entityId: 'PH-021', entityName: '+91 98201-00421 (Rahul\'s Phone)', entityType: 'PHONE', viaEdgeLabel: 'COMMUNICATED_WITH', viaCategory: 'COMMUNICATION', viaEvidenceId: 'CDR-0112', confidence: 0.91 },
       { entityId: 'P-037', entityName: 'Vikram Singh', entityType: 'PERSON' }
     ],
     pathBreadcrumb: [
       { entityId: 'P-014', entityName: 'Rahul Sharma', entityType: 'PERSON', viaEdgeLabel: 'COMMUNICATED_WITH', viaCategory: 'COMMUNICATION', viaEvidenceId: 'CDR-0087', confidence: 0.94 },
-      { entityId: 'PH-021', entityName: 'Phone X', entityType: 'PHONE', viaEdgeLabel: 'COMMUNICATED_WITH', viaCategory: 'COMMUNICATION', viaEvidenceId: 'CDR-0112', confidence: 0.91 },
+      { entityId: 'PH-021', entityName: '+91 98201-00421 (Rahul\'s Phone)', entityType: 'PHONE', viaEdgeLabel: 'COMMUNICATED_WITH', viaCategory: 'COMMUNICATION', viaEvidenceId: 'CDR-0112', confidence: 0.91 },
       { entityId: 'P-037', entityName: 'Vikram Singh', entityType: 'PERSON' }
     ],
     intermediaryEntities: [
-      { id: 'PH-021', name: 'Phone X', type: 'PHONE', role: '+91 98••• 0421 (Burner SIM)' }
+      { id: 'PH-021', name: '+91 98201-00421 (Rahul\'s Phone)', type: 'PHONE', role: '+91 98201-00421 (Burner SIM)' }
     ],
-    intermediaryValue: 'Phone X (+91 98••• 0421)',
+    intermediaryValue: '+91 98201-00421 (Burner SIM)',
     corroboratingEvidenceCount: 2,
     evidenceRecordIds: ['CDR-0087', 'CDR-0112'],
     evidenceSnippets: [
-      'CDR-0087: Rahul Sharma voice call to Phone X at 23:41 IST',
-      'CDR-0112: Phone X relay communication to Vikram Singh at 23:48 IST'
+      'CDR-0087: Rahul Sharma voice call to +91 98201-00421 at 23:41 IST',
+      'CDR-0112: +91 98201-00421 relay communication to Vikram Singh at 23:48 IST'
     ],
     caseDocket: 'CR-2026-0142',
     riskRating: 'HIGH',
@@ -581,8 +777,8 @@ export const BASELINE_HIDDEN_RELATIONSHIPS: DiscoveredHiddenRelationship[] = [
     categoryLabel: 'SHARED VEHICLE',
     categoryTitle: 'SHARED VEHICLE ASSET',
     title: 'Shared Transit Asset: Vikram Singh ↔ Amit Kumar',
-    narrative: 'Surveillance and ANPR logs link both Vikram Singh and Amit Kumar to transit vehicle Vehicle V (MH 04 KX 231) without any direct phone call recorded between them.',
-    discoverySummary: 'Surveillance and ANPR logs link both Vikram Singh and Amit Kumar to transit vehicle Vehicle V (MH 04 KX 231) without any direct phone call recorded between them.',
+    narrative: 'Surveillance and ANPR logs link both Vikram Singh and Amit Kumar to transit vehicle Mahindra Scorpio (MH-04-KX-2311) without any direct phone call recorded between them.',
+    discoverySummary: 'Surveillance and ANPR logs link both Vikram Singh and Amit Kumar to transit vehicle Mahindra Scorpio (MH-04-KX-2311) without any direct phone call recorded between them.',
     confidence: 0.90,
     hops: 2,
     hopCount: 2,
@@ -590,23 +786,23 @@ export const BASELINE_HIDDEN_RELATIONSHIPS: DiscoveredHiddenRelationship[] = [
     pathEdgeIds: ['e3', 'e4'],
     pathSteps: [
       { entityId: 'P-037', entityName: 'Vikram Singh', entityType: 'PERSON', viaEdgeLabel: 'USES', viaCategory: 'VEHICLE', viaEvidenceId: 'VEH-0231', confidence: 0.88 },
-      { entityId: 'V-009', entityName: 'Vehicle V', entityType: 'VEHICLE', viaEdgeLabel: 'OBSERVED_WITH', viaCategory: 'VEHICLE', viaEvidenceId: 'VEH-0240', confidence: 0.86 },
+      { entityId: 'V-009', entityName: 'Mahindra Scorpio (MH-04-KX-2311)', entityType: 'VEHICLE', viaEdgeLabel: 'OBSERVED_WITH', viaCategory: 'VEHICLE', viaEvidenceId: 'VEH-0240', confidence: 0.86 },
       { entityId: 'P-052', entityName: 'Amit Kumar', entityType: 'PERSON' }
     ],
     pathBreadcrumb: [
       { entityId: 'P-037', entityName: 'Vikram Singh', entityType: 'PERSON', viaEdgeLabel: 'USES', viaCategory: 'VEHICLE', viaEvidenceId: 'VEH-0231', confidence: 0.88 },
-      { entityId: 'V-009', entityName: 'Vehicle V', entityType: 'VEHICLE', viaEdgeLabel: 'OBSERVED_WITH', viaCategory: 'VEHICLE', viaEvidenceId: 'VEH-0240', confidence: 0.86 },
+      { entityId: 'V-009', entityName: 'Mahindra Scorpio (MH-04-KX-2311)', entityType: 'VEHICLE', viaEdgeLabel: 'OBSERVED_WITH', viaCategory: 'VEHICLE', viaEvidenceId: 'VEH-0240', confidence: 0.86 },
       { entityId: 'P-052', entityName: 'Amit Kumar', entityType: 'PERSON' }
     ],
     intermediaryEntities: [
-      { id: 'V-009', name: 'Vehicle V', type: 'VEHICLE', role: 'MH 04 KX 231 (Transit Asset)' }
+      { id: 'V-009', name: 'Mahindra Scorpio (MH-04-KX-2311)', type: 'VEHICLE', role: 'MH 04 KX 2311 (Transit Asset)' }
     ],
-    intermediaryValue: 'Vehicle V (MH 04 KX 231)',
+    intermediaryValue: 'Mahindra Scorpio (MH-04-KX-2311)',
     corroboratingEvidenceCount: 2,
     evidenceRecordIds: ['VEH-0231', 'VEH-0240'],
     evidenceSnippets: [
-      'VEH-0231: Field observation confirms Vikram Singh operating Vehicle V',
-      'VEH-0240: ANPR / CCTV sighting captures Amit Kumar occupying Vehicle V'
+      'VEH-0231: Field observation confirms Vikram Singh operating Mahindra Scorpio',
+      'VEH-0240: ANPR / CCTV sighting captures Amit Kumar occupying Mahindra Scorpio'
     ],
     caseDocket: 'CR-2026-0142',
     riskRating: 'HIGH',
@@ -619,17 +815,17 @@ export const BASELINE_HIDDEN_RELATIONSHIPS: DiscoveredHiddenRelationship[] = [
     sourceNodeId: 'P-037',
     targetNodeId: 'BA-11',
     sourceName: 'Vikram Singh',
-    targetName: 'Account A',
+    targetName: 'HDFC Bank (Vikram - Current)',
     sourceNodeName: 'Vikram Singh',
-    targetNodeName: 'Account A',
+    targetNodeName: 'HDFC Bank (Vikram - Current)',
     sourceType: 'PERSON',
     targetType: 'BANK ACCOUNT',
     category: 'FINANCIAL_CONDUIT',
     categoryLabel: 'FINANCIAL FLOW',
     categoryTitle: 'FINANCIAL CONDUIT',
-    title: 'Financial Money Conduit: Vikram Singh ↔ Account A',
-    narrative: 'Corporate filings and banking wire transfers connect Vikram Singh to Account A via commercial shell entity Organization N, indicating corporate fund diversion and money mule routing.',
-    discoverySummary: 'Corporate filings and banking wire transfers connect Vikram Singh to Account A via commercial shell entity Organization N, indicating corporate fund diversion and money mule routing.',
+    title: 'Financial Money Conduit: Vikram Singh ↔ HDFC Bank (Vikram - Current)',
+    narrative: 'Corporate filings and banking wire transfers connect Vikram Singh to HDFC Bank (Vikram - Current) via commercial shell entity Apex Global Logistics (ORG-03), indicating corporate fund diversion and money mule routing.',
+    discoverySummary: 'Corporate filings and banking wire transfers connect Vikram Singh to HDFC Bank (Vikram - Current) via commercial shell entity Apex Global Logistics (ORG-03), indicating corporate fund diversion and money mule routing.',
     confidence: 0.88,
     hops: 2,
     hopCount: 2,
@@ -637,23 +833,23 @@ export const BASELINE_HIDDEN_RELATIONSHIPS: DiscoveredHiddenRelationship[] = [
     pathEdgeIds: ['e6', 'e9'],
     pathSteps: [
       { entityId: 'P-037', entityName: 'Vikram Singh', entityType: 'PERSON', viaEdgeLabel: 'MEMBER_OF', viaCategory: 'ORGANIZATION', viaEvidenceId: 'ORG-0022', confidence: 0.77 },
-      { entityId: 'O-003', entityName: 'Organization N', entityType: 'ORGANIZATION', viaEdgeLabel: 'TRANSFERRED_MONEY_TO', viaCategory: 'FINANCIAL', viaEvidenceId: 'FIN-0192', confidence: 0.83 },
-      { entityId: 'BA-11', entityName: 'Account A', entityType: 'BANK ACCOUNT' }
+      { entityId: 'O-003', entityName: 'Apex Global Logistics (ORG-03)', entityType: 'ORGANIZATION', viaEdgeLabel: 'TRANSFERRED_MONEY_TO', viaCategory: 'FINANCIAL', viaEvidenceId: 'FIN-0192', confidence: 0.83 },
+      { entityId: 'BA-11', entityName: 'HDFC Bank (Vikram - Current)', entityType: 'BANK ACCOUNT' }
     ],
     pathBreadcrumb: [
       { entityId: 'P-037', entityName: 'Vikram Singh', entityType: 'PERSON', viaEdgeLabel: 'MEMBER_OF', viaCategory: 'ORGANIZATION', viaEvidenceId: 'ORG-0022', confidence: 0.77 },
-      { entityId: 'O-003', entityName: 'Organization N', entityType: 'ORGANIZATION', viaEdgeLabel: 'TRANSFERRED_MONEY_TO', viaCategory: 'FINANCIAL', viaEvidenceId: 'FIN-0192', confidence: 0.83 },
-      { entityId: 'BA-11', entityName: 'Account A', entityType: 'BANK ACCOUNT' }
+      { entityId: 'O-003', entityName: 'Apex Global Logistics (ORG-03)', entityType: 'ORGANIZATION', viaEdgeLabel: 'TRANSFERRED_MONEY_TO', viaCategory: 'FINANCIAL', viaEvidenceId: 'FIN-0192', confidence: 0.83 },
+      { entityId: 'BA-11', entityName: 'HDFC Bank (Vikram - Current)', entityType: 'BANK ACCOUNT' }
     ],
     intermediaryEntities: [
-      { id: 'O-003', name: 'Organization N', type: 'ORGANIZATION', role: 'Commercial Shell Entity' }
+      { id: 'O-003', name: 'Apex Global Logistics (ORG-03)', type: 'ORGANIZATION', role: 'Commercial Shell Entity' }
     ],
-    intermediaryValue: 'Organization N (Commercial Shell Entity)',
+    intermediaryValue: 'Apex Global Logistics (ORG-03)',
     corroboratingEvidenceCount: 2,
     evidenceRecordIds: ['ORG-0022', 'FIN-0192'],
     evidenceSnippets: [
-      'ORG-0022: Corporate registry lists Vikram Singh as key managing director of Organization N',
-      'FIN-0192: Banking wire log records transfers from Account A to Organization N'
+      'ORG-0022: Corporate registry lists Vikram Singh as key managing director of Apex Global Logistics',
+      'FIN-0192: Banking wire log records transfers from Account to Apex Global Logistics'
     ],
     caseDocket: 'CR-2026-0142',
     riskRating: 'MEDIUM',
@@ -675,8 +871,8 @@ export const BASELINE_HIDDEN_RELATIONSHIPS: DiscoveredHiddenRelationship[] = [
     categoryLabel: 'CO-LOCATION',
     categoryTitle: 'CO-LOCATION POINT',
     title: 'Spatial-Temporal Convergence: Rahul Sharma ↔ Vikram Singh',
-    narrative: 'Tower dump logs register Rahul Sharma at Location Z (Andheri East), where vehicle Vehicle V was logged by ANPR toll sensors, which is operated by Vikram Singh.',
-    discoverySummary: 'Tower dump logs register Rahul Sharma at Location Z (Andheri East), where vehicle Vehicle V was logged by ANPR toll sensors, which is operated by Vikram Singh.',
+    narrative: 'Tower dump logs register Rahul Sharma at Andheri East Transit Terminal (LOC-08), where vehicle Mahindra Scorpio (MH-04-KX-2311) was logged by ANPR toll sensors, which is operated by Vikram Singh.',
+    discoverySummary: 'Tower dump logs register Rahul Sharma at Andheri East Transit Terminal (LOC-08), where vehicle Mahindra Scorpio (MH-04-KX-2311) was logged by ANPR toll sensors, which is operated by Vikram Singh.',
     confidence: 0.84,
     hops: 3,
     hopCount: 3,
@@ -684,27 +880,27 @@ export const BASELINE_HIDDEN_RELATIONSHIPS: DiscoveredHiddenRelationship[] = [
     pathEdgeIds: ['e5', 'e10', 'e3'],
     pathSteps: [
       { entityId: 'P-014', entityName: 'Rahul Sharma', entityType: 'PERSON', viaEdgeLabel: 'VISITED', viaCategory: 'LOCATION', viaEvidenceId: 'LOC-0041', confidence: 0.79 },
-      { entityId: 'L-008', entityName: 'Location Z', entityType: 'LOCATION', viaEdgeLabel: 'LOCATED_AT', viaCategory: 'LOCATION', viaEvidenceId: 'LOC-0052', confidence: 0.75 },
-      { entityId: 'V-009', entityName: 'Vehicle V', entityType: 'VEHICLE', viaEdgeLabel: 'USES', viaCategory: 'VEHICLE', viaEvidenceId: 'VEH-0231', confidence: 0.88 },
+      { entityId: 'L-008', entityName: 'Andheri East Transit Terminal (LOC-08)', entityType: 'LOCATION', viaEdgeLabel: 'LOCATED_AT', viaCategory: 'LOCATION', viaEvidenceId: 'LOC-0052', confidence: 0.75 },
+      { entityId: 'V-009', entityName: 'Mahindra Scorpio (MH-04-KX-2311)', entityType: 'VEHICLE', viaEdgeLabel: 'USES', viaCategory: 'VEHICLE', viaEvidenceId: 'VEH-0231', confidence: 0.88 },
       { entityId: 'P-037', entityName: 'Vikram Singh', entityType: 'PERSON' }
     ],
     pathBreadcrumb: [
       { entityId: 'P-014', entityName: 'Rahul Sharma', entityType: 'PERSON', viaEdgeLabel: 'VISITED', viaCategory: 'LOCATION', viaEvidenceId: 'LOC-0041', confidence: 0.79 },
-      { entityId: 'L-008', entityName: 'Location Z', entityType: 'LOCATION', viaEdgeLabel: 'LOCATED_AT', viaCategory: 'LOCATION', viaEvidenceId: 'LOC-0052', confidence: 0.75 },
-      { entityId: 'V-009', entityName: 'Vehicle V', entityType: 'VEHICLE', viaEdgeLabel: 'USES', viaCategory: 'VEHICLE', viaEvidenceId: 'VEH-0231', confidence: 0.88 },
+      { entityId: 'L-008', entityName: 'Andheri East Transit Terminal (LOC-08)', entityType: 'LOCATION', viaEdgeLabel: 'LOCATED_AT', viaCategory: 'LOCATION', viaEvidenceId: 'LOC-0052', confidence: 0.75 },
+      { entityId: 'V-009', entityName: 'Mahindra Scorpio (MH-04-KX-2311)', entityType: 'VEHICLE', viaEdgeLabel: 'USES', viaCategory: 'VEHICLE', viaEvidenceId: 'VEH-0231', confidence: 0.88 },
       { entityId: 'P-037', entityName: 'Vikram Singh', entityType: 'PERSON' }
     ],
     intermediaryEntities: [
-      { id: 'L-008', name: 'Location Z', type: 'LOCATION', role: 'Andheri East Surveillance Sector' },
-      { id: 'V-009', name: 'Vehicle V', type: 'VEHICLE', role: 'MH 04 KX 231 (Transit Asset)' }
+      { id: 'L-008', name: 'Andheri East Transit Terminal (LOC-08)', type: 'LOCATION', role: 'Andheri East Surveillance Sector' },
+      { id: 'V-009', name: 'Mahindra Scorpio (MH-04-KX-2311)', type: 'VEHICLE', role: 'MH 04 KX 2311 (Transit Asset)' }
     ],
-    intermediaryValue: 'Location Z / Vehicle V',
+    intermediaryValue: 'Andheri East Terminal / Mahindra Scorpio',
     corroboratingEvidenceCount: 3,
     evidenceRecordIds: ['LOC-0041', 'LOC-0052', 'VEH-0231'],
     evidenceSnippets: [
-      'LOC-0041: Tower dump verifies Rahul Sharma in Location Z sector',
-      'LOC-0052: Toll plaza ANPR registers Vehicle V entering Location Z',
-      'VEH-0231: Field observation confirms Vikram Singh operating Vehicle V'
+      'LOC-0041: Tower dump verifies Rahul Sharma in Andheri East sector',
+      'LOC-0052: Toll plaza ANPR registers Mahindra Scorpio entering sector',
+      'VEH-0231: Field observation confirms Vikram Singh operating Mahindra Scorpio'
     ],
     caseDocket: 'CR-2026-0142',
     riskRating: 'MEDIUM',

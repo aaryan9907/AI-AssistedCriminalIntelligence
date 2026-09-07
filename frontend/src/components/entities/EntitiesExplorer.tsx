@@ -8,6 +8,7 @@ import {
 } from '../../services/nexusData';
 import { useIntelData } from '../../context/IntelDataContext';
 import { NavSection } from '../layout/SidebarNav';
+import { getEntityDisplayName } from '../../services/canonicalEntities';
 
 interface EntitiesExplorerProps {
   entities?: any[];
@@ -26,7 +27,7 @@ export const EntitiesExplorer: React.FC<EntitiesExplorerProps> = ({
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   const filteredEntities = allNodes.filter((entity) =>
-    `${entity.name} ${entity.id} ${entity.type} ${entity.subtitle}`
+    `${getEntityDisplayName(entity)} ${entity.name} ${entity.id} ${entity.type} ${entity.subtitle}`
       .toLowerCase()
       .includes(searchQuery.toLowerCase())
   );
@@ -77,7 +78,7 @@ export const EntitiesExplorer: React.FC<EntitiesExplorerProps> = ({
               </div>
 
               <div className="font-display text-base font-semibold text-foreground mt-4">
-                {entity.name}
+                {getEntityDisplayName(entity)}
               </div>
               <div className="font-mono text-[10px] text-muted-foreground mt-1">
                 {entity.type} · {entity.subtitle}

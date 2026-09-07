@@ -3,6 +3,7 @@ import { ShieldAlert, ArrowRight, CheckCircle, AlertCircle, Sparkles, FileText, 
 import { NavSection } from '../layout/SidebarNav';
 import { useIntelData } from '../../context/IntelDataContext';
 import { NEXUS_NODES, NEXUS_EVIDENCE, NEXUS_SUGGESTIONS } from '../../services/nexusData';
+import { getEntityDisplayName } from '../../services/canonicalEntities';
 
 interface LeadsViewProps {
   leads?: any[];
@@ -92,7 +93,7 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
                 return (
                   <React.Fragment key={nodeId}>
                     <span className="px-2 py-1 rounded bg-panel/90 border border-signal/25 text-signal font-semibold">
-                      {node?.name || nodeId}
+                      {getEntityDisplayName(node || nodeId)}
                       <span className="text-[9px] text-muted-foreground ml-1.5 font-normal">
                         ({node?.type || 'ENTITY'})
                       </span>
