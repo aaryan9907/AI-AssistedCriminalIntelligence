@@ -61,16 +61,15 @@ def get_current_system_stats() -> Dict[str, Any]:
     }
 
 
-try:
-    from fastapi import FastAPI, HTTPException, Query
-    from fastapi.middleware.cors import CORSMiddleware
-    from pydantic import BaseModel
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
-    app = FastAPI(
-        title="AI-Assisted Criminal Intelligence & Link Discovery API",
-        version="2.0.0",
-        description="API for SIH26189 prototype"
-    )
+app = FastAPI(
+    title="AI-Assisted Criminal Intelligence & Link Discovery API",
+    version="2.0.0",
+    description="API for SIH26189 prototype"
+)
 
     # Configurable CORS origins
     cors_origins = [o.strip() for o in os.environ.get("CORS_ORIGINS", "*").split(",") if o.strip()]
