@@ -58,6 +58,7 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ### Backend (FastAPI Intelligence Engine)
 ```bash
+pip install -r requirements.txt
 python3 backend/main.py
 ```
 Runs at [http://localhost:8000](http://localhost:8000). The frontend automatically connects to the backend or seamlessly uses the internal synthetic engine if the backend is offline.
